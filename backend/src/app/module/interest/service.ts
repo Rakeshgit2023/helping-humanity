@@ -13,13 +13,23 @@ export const create = async ({ interests }: InterestInput) => {
       throw ApiError.conflict(error.cause.detail);
     }
 
-    throw error;
+    throw ApiError.internal(
+      error?.cause?.detail ||
+        "Unable to create interest. Please try again later.",
+    );
   }
 };
 
 export const search = async ({ name }: SearchInput) => {
-  return await db
-    .select()
-    .from(interestTable)
-    .where(ilike(interestTable.name, `%${name}%`));
+  try {
+    return await db
+      .select()
+      .from(interestTable)
+      .where(ilike(interestTable.name, `%${name}%`));
+  } catch (error: any) {
+    throw ApiError.internal(
+      error?.cause?.detail ||
+        "Unable to search interests. Please try again later.",
+    );
+  }
 };

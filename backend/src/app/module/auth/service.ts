@@ -76,12 +76,15 @@ export const register = async ({
 
     await sendVerificationEmail(email, emailVerificationOtp);
     return newUser;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Register Error:", error);
     if (error instanceof ApiError) {
       throw error;
     }
-    throw ApiError.internal("Unable to register user. Please try again later.");
+    throw ApiError.internal(
+      error?.cause?.detail ||
+        "Unable to register user. Please try again later.",
+    );
   }
 };
 
@@ -122,12 +125,14 @@ export const signIn = async ({ email, password }: SignInInput) => {
       .where(eq(usersTable.email, email));
 
     return { user: claims, accessToken, refreshToken };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Sign In Error:", error);
     if (error instanceof ApiError) {
       throw error;
     }
-    throw ApiError.internal("Unable to sign in. Please try again later.");
+    throw ApiError.internal(
+      error?.cause?.detail || "Unable to sign in. Please try again later.",
+    );
   }
 };
 
@@ -159,12 +164,14 @@ export const verifyEmailWithOtp = async ({
         emailVerificationOtpExpiresAt: null,
       })
       .where(eq(usersTable.id, user.id));
-  } catch (error) {
+  } catch (error: any) {
     console.error("Verify Email with OTP Error:", error);
     if (error instanceof ApiError) {
       throw error;
     }
-    throw ApiError.internal("Unable to verify email. Please try again later.");
+    throw ApiError.internal(
+      error?.cause?.detail || "Unable to verify email. Please try again later.",
+    );
   }
 };
 
@@ -190,13 +197,14 @@ export const sendOtpForEmailVerification = async ({
       })
       .where(eq(usersTable.id, user.id));
     await sendVerificationEmail(email, emailVerificationOtp);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Send OTP for Email Verification Error:", error);
     if (error instanceof ApiError) {
       throw error;
     }
     throw ApiError.internal(
-      "Unable to send OTP for email verification. Please try again later.",
+      error?.cause?.detail ||
+        "Unable to send OTP for email verification. Please try again later.",
     );
   }
 };
