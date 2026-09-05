@@ -8,6 +8,12 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRES_IN: z.string(),
   JWT_REFRESH_SECRET: z.string(),
   JWT_REFRESH_EXPIRES_IN: z.string(),
+  SMTP_HOST: z.string(),
+  SMTP_PORT: z.string(),
+  SMTP_USER: z.string(),
+  SMTP_PASS: z.string(),
+  SMTP_FROM_NAME: z.string(),
+  CLIENT_URL: z.string(),
 });
 
 const createEnv = (env: NodeJS.ProcessEnv) => {
