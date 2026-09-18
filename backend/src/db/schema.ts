@@ -3,104 +3,145 @@ import {
   uuid,
   varchar,
   text,
-  date,
   timestamp,
-  primaryKey,
   boolean,
+  pgEnum,
+  uniqueIndex,
+  index,
+  date,
+  doublePrecision,
+  integer,
+  primaryKey,
 } from "drizzle-orm/pg-core";
+import {
+  booldGroupValues,
+  genderValues,
+  roleValues,
+} from "../app/comman/utils/constant.js";
 
-// ====================
-// Interests Table
-// ====================
+export const roleEnum = pgEnum("role", roleValues);
 
-export const interestTable = pgTable("interests", {
-  id: uuid("id").defaultRandom().primaryKey(),
+export const genderEnum = pgEnum("gender", genderValues);
 
-  name: varchar("name", {
-    length: 50,
-  })
-    .notNull()
-    .unique(),
-});
+export const bloodGroupEnum = pgEnum("blood_group", booldGroupValues);
 
-// ====================
-// Users Table
-// ====================
-
-export const usersTable = pgTable("users", {
-  id: uuid("id").defaultRandom().primaryKey(),
-
-  firstName: varchar("first_name", {
-    length: 45,
-  }).notNull(),
-
-  lastName: varchar("last_name", {
-    length: 45,
-  }).notNull(),
-
-  role: varchar("role", {
-    length: 20,
-  })
-    .notNull()
-    .default("user"),
-
-  email: varchar("email", {
-    length: 322,
-  })
-    .notNull()
-    .unique(),
-
-  mobileNumber: varchar("mobile_number", {
-    length: 20,
-  })
-    .unique()
-    .notNull(),
-
-  state: varchar("state", {
-    length: 100,
-  }).notNull(),
-
-  dob: date("dob").notNull(),
-
-  refreshToken: text("refresh_token"),
-  password: varchar("password", { length: 66 }),
-
-  emailVerified: boolean("email_verified").default(false).notNull(),
-
-  emailVerificationOtp: text("email_verification_otp"),
-  emailVerificationOtpExpiresAt: timestamp("email_verification_otp_expires_at"),
-
-  resetPasswordOtp: text("reset_password_otp"),
-  resetPasswordOtpExpiresAt: timestamp("reset_password_otp_expires_at"),
-
-  isActive: boolean("is_active").notNull().default(true),
-
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").$onUpdate(() => new Date()),
-});
-
-// ====================
-// User Interests Table
-// ====================
-
-export const userInterestsTable = pgTable(
-  "user_interests",
+export const users = pgTable(
+  "users",
   {
+    id: uuid("id").primaryKey().defaultRandom(),
+    firstName: varchar("first_name", { length: 100 }).notNull(),
+    lastName: varchar("last_name", { length: 100 }).notNull(),
+    phone: varchar("phone", { length: 20 }).notNull(),
+    email: varchar("email", { length: 322 }).notNull(),
+    dob: date("dob"),
+    passwordHash: varchar("password", { length: 66 }),
+    role: roleEnum("role").notNull().default("user"),
+    gender: genderEnum("gender").notNull(),
+    avatarUrl: text("avatar_url"),
+    isEmailVerified: boolean("is_email_verified").notNull().default(false),
+    isBanned: boolean("is_banned").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date(),
+    ),
+  },
+  (t) => [
+    uniqueIndex("users_phone_idx").on(t.phone),
+    uniqueIndex("users_email_idx").on(t.email),
+  ],
+);
+
+export const emailVerificationOtps = pgTable(
+  "email_verification_otps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
     userId: uuid("user_id")
       .notNull()
-      .references(() => usersTable.id, {
-        onDelete: "cascade",
-      }),
+      .references(() => users.id, { onDelete: "cascade" }),
 
-    interestId: uuid("interest_id")
+    otpHash: varchar("otp_hash", { length: 255 }).notNull(),
+
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+    }).notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
       .notNull()
-      .references(() => interestTable.id, {
-        onDelete: "cascade",
-      }),
+      .defaultNow(),
   },
-  (table) => [
-    primaryKey({
-      columns: [table.userId, table.interestId],
-    }),
+  (t) => [uniqueIndex("email_verification_otps_user_idx").on(t.userId)],
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    refreshTokenHash: text("refresh_token_hash").notNull(),
+    userAgent: text("user_agent"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("sessions_user_idx").on(t.userId),
+    uniqueIndex("sessions_refresh_token_hash_idx").on(t.refreshTokenHash),
   ],
+);
+
+export const volunteerProfiles = pgTable(
+  "volunteer_profiles",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bio: text("bio"),
+    isVerified: boolean("is_verified").notNull().default(false), // admin-approved
+    isAvailable: boolean("is_available").notNull().default(true), // on/off duty toggle
+    bloodGroup: bloodGroupEnum("blood_group"), // relevant if interested in blood_donation
+    lastLat: doublePrecision("last_lat"),
+    lastLng: doublePrecision("last_lng"),
+    lastLocationAt: timestamp("last_location_at", { withTimezone: true }),
+    ratingAvg: doublePrecision("rating_avg").notNull().default(0),
+    ratingCount: integer("rating_count").notNull().default(0),
+    avgResponseMinutes: integer("avg_response_minutes"), // powers the "Avg response" stat
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date(),
+    ),
+  },
+  (t) => [index("volunteer_availability_idx").on(t.isAvailable)],
+);
+
+export const category = pgTable(
+  "category",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull().unique(),
+    isActive: boolean("is_active").notNull().default(true),
+  },
+  (t) => [uniqueIndex("category_name_idx").on(t.name)],
+);
+
+export const volunteerInterests = pgTable(
+  "volunteer_interests",
+  {
+    volunteerId: uuid("volunteer_id")
+      .notNull()
+      .references(() => volunteerProfiles.userId, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.volunteerId, t.categoryId] })],
 );

@@ -1,35 +1,33 @@
 import type { Request, Response, NextFunction } from "express";
 import ApiError from "../utils/api.error.js";
-import path from "node:path";
 
 export const errorHandler = (
-  err: Error,
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction,
 ) => {
-  const acceptsHtml = req.headers.accept?.includes("text/html");
-
-  // Agar ApiError hai
   if (err instanceof ApiError) {
-    res.status(err.statusCode).json({
+    return res.status(err.statusCode).json({
       success: false,
-      statusCode: err.statusCode,
       message: err.message,
     });
-    return;
   }
 
-  // Unexpected error
-  console.error("Unexpected Error:", err);
-
-  if (acceptsHtml) {
-    return res.status(500).sendFile(path.resolve("public", "error.html"));
+  if (err?.code === "23505" || err?.cause?.code === "23505") {
+    return res
+      .status(409)
+      .json({ success: false, message: "This record already exists" });
+  }
+  if (err?.code === "23503" || err?.cause?.code === "23503") {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid reference" });
   }
 
-  res.status(500).json({
+  console.error("Unhandled error reached globalErrorHandler:", err);
+  return res.status(500).json({
     success: false,
-    statusCode: 500,
-    message: "Internal Server Error",
+    message: "Something went wrong. Please try again later.",
   });
 };

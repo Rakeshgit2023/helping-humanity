@@ -8,7 +8,7 @@ export const register = async (req: Request, res: Response) => {
 };
 
 export const signIn = async (req: Request, res: Response) => {
-  const user = await authService.signIn(req.body);
+  const user = await authService.signIn(req.body, req.get("user-agent") || "");
   return ApiResponse.ok(res, "User signed in successfully", user);
 };
 

@@ -1,2 +1,0 @@
-ALTER TABLE "users" ALTER COLUMN "email_verification_otp" SET DATA TYPE text USING "email_verification_otp"::text;--> statement-breakpoint
-ALTER TABLE "users" ALTER COLUMN "reset_password_otp" SET DATA TYPE text USING "reset_password_otp"::text;
