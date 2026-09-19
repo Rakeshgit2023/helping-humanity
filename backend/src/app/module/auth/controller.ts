@@ -1,20 +1,39 @@
 import type { Request, Response } from "express";
 import * as authService from "./service.js";
 import ApiResponse from "../../comman/utils/api.response.js";
+import type { RegisterResponse } from "./dto/register.dto.js";
+import type { SignInResponseInput } from "./dto/signIn.dto.js";
+import type { verifyEmailWithOtpResponseInput } from "./dto/verifyEmailWithOtp.dto.js";
+import type { SendOtpForEmailVerificationResponseInput } from "./dto/sendOtpForEmailVerification.dto.js";
 
 export const register = async (req: Request, res: Response) => {
   const user = await authService.register(req.body);
-  return ApiResponse.created(res, "User registered successfully", user);
+  const response: RegisterResponse = {
+    message: "Registration successful. Please verify your email.",
+    user,
+  };
+  return ApiResponse.created(res, response.message, response.user);
 };
 
 export const signIn = async (req: Request, res: Response) => {
-  const user = await authService.signIn(req.body, req.get("user-agent") || "");
-  return ApiResponse.ok(res, "User signed in successfully", user);
+  const userData = await authService.signIn(
+    req.body,
+    req.get("user-agent") || "",
+  );
+  const response: SignInResponseInput = {
+    message: "User signed in successfully",
+    data: userData,
+  };
+  return ApiResponse.ok(res, response.message, response.data);
 };
 
 export const verifyEmailWithOtp = async (req: Request, res: Response) => {
-  await authService.verifyEmailWithOtp(req.body);
-  return ApiResponse.ok(res, "Email verified successfully", {});
+  const user = await authService.verifyEmailWithOtp(req.body);
+  const response: verifyEmailWithOtpResponseInput = {
+    message: "Email verified successfully",
+    data: user,
+  };
+  return ApiResponse.ok(res, response.message, response.data);
 };
 
 export const sendOtpForEmailVerification = async (
@@ -22,5 +41,9 @@ export const sendOtpForEmailVerification = async (
   res: Response,
 ) => {
   await authService.sendOtpForEmailVerification(req.body);
-  return ApiResponse.ok(res, "OTP sent successfully", {});
+  const response: SendOtpForEmailVerificationResponseInput = {
+    message: "OTP sent successfully. Please check your email.",
+    data: null,
+  };
+  return ApiResponse.ok(res, response.message);
 };

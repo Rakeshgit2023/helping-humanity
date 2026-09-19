@@ -84,7 +84,6 @@ export const register = withErrorHandling(
           phone: users.phone,
           dob: users.dob,
           role: users.role,
-          isEmailVerified: users.isEmailVerified,
         });
 
       if (!newUser) {
@@ -133,10 +132,7 @@ export const register = withErrorHandling(
 
     await sendVerificationEmail(result.user.email, otp);
 
-    return {
-      user: result.user,
-      message: "Registration successful. Please verify your email.",
-    };
+    return result.user;
   },
 );
 
@@ -280,7 +276,6 @@ export const verifyEmailWithOtp = withErrorHandling(
     });
 
     return {
-      message: "Email verified successfully",
       userId: result.userId,
       email: result.email,
     };
@@ -346,7 +341,5 @@ export const sendOtpForEmailVerification = withErrorHandling(
       });
 
     await sendVerificationEmail(user.email, otp);
-
-    return { message: "OTP sent successfully. Please check your email." };
   },
 );

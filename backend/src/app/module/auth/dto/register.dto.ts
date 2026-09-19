@@ -62,7 +62,7 @@ const baseRegisterSchema = z.object({
     .optional(),
 });
 
-const registerSchema = baseRegisterSchema.superRefine((data, ctx) => {
+export const registerSchema = baseRegisterSchema.superRefine((data, ctx) => {
   if (data.role !== "volunteer") return;
 
   if (!data.interests || data.interests.length === 0) {
@@ -83,6 +83,21 @@ const registerSchema = baseRegisterSchema.superRefine((data, ctx) => {
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+export const registerResponseSchema = z.object({
+  message: z.string(),
+  user: z.object({
+    id: z.uuid(),
+    firstName: z.string(),
+    lastName: z.string(),
+    email: z.email(),
+    phone: z.string(),
+    dob: z.string().nullable(),
+    role: z.enum(roleValues),
+  }),
+});
+
+export type RegisterResponse = z.infer<typeof registerResponseSchema>;
 
 class RegisterDto extends BaseDto<typeof registerSchema.shape> {
   constructor() {
