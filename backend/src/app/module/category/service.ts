@@ -28,7 +28,11 @@ export const searchCategory = withErrorHandling(
   "Search Category",
   async ({ name }: SearchCategoryInput) => {
     return await db
-      .select()
+      .select({
+        id: category.id,
+        name: category.name,
+        isActive: category.isActive,
+      })
       .from(category)
       .where(ilike(category.name, `%${name}%`));
   },

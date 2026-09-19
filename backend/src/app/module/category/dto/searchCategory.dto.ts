@@ -1,7 +1,7 @@
 import z from "zod";
 import BaseDto from "../../../comman/dto/base.dto.js";
 
-const searchCategorySchema = z.object({
+export const searchCategorySchema = z.object({
   name: z
     .string({
       error: "Category name is required and it should be a string",
@@ -12,6 +12,21 @@ const searchCategorySchema = z.object({
 });
 
 export type SearchCategoryInput = z.infer<typeof searchCategorySchema>;
+
+export const searchCategoryResponseSchema = z.object({
+  message: z.string(),
+  data: z.array(
+    z.object({
+      id: z.uuid(),
+      name: z.string(),
+      isActive: z.boolean(),
+    }),
+  ),
+});
+
+export type SearchCategoryResponseInput = z.infer<
+  typeof searchCategoryResponseSchema
+>;
 
 class SearchCategoryDto extends BaseDto<typeof searchCategorySchema.shape> {
   constructor() {

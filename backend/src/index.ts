@@ -1,3 +1,4 @@
+import "./app/openapi/zod-extend.js";
 import http from "http";
 import { createExpressApplication } from "./app/index.js";
 import { env } from "./env.js";

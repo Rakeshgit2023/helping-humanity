@@ -1,7 +1,7 @@
 import z from "zod";
 import BaseDto from "../../../comman/dto/base.dto.js";
 
-const createCategorySchema = z.object({
+export const createCategorySchema = z.object({
   categories: z
     .array(
       z.object({
@@ -20,6 +20,20 @@ const createCategorySchema = z.object({
 });
 
 export type CreateCategoryInput = z.infer<typeof createCategorySchema>;
+
+export const createCategoryResponseSchema = z.object({
+  message: z.string(),
+  data: z.array(
+    z.object({
+      id: z.uuid(),
+      name: z.string(),
+    }),
+  ),
+});
+
+export type CreateCategoryResponseInput = z.infer<
+  typeof createCategoryResponseSchema
+>;
 
 class CreateCategoryDto extends BaseDto<typeof createCategorySchema.shape> {
   constructor() {

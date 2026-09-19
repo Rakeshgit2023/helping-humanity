@@ -1,7 +1,7 @@
 import z from "zod";
 import BaseDto from "../../../comman/dto/base.dto.js";
 
-const verifyEmailWithOtpSchema = z.object({
+export const verifyEmailWithOtpSchema = z.object({
   email: z.string({ error: "Email is required" }).email("Invalid email format"),
 
   otp: z
@@ -11,6 +11,18 @@ const verifyEmailWithOtpSchema = z.object({
 });
 
 export type VerifyEmailWithOtpInput = z.infer<typeof verifyEmailWithOtpSchema>;
+
+export const verifyEmailWithOtpResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    userId: z.uuid(),
+    email: z.email(),
+  }),
+});
+
+export type verifyEmailWithOtpResponseInput = z.infer<
+  typeof verifyEmailWithOtpResponseSchema
+>;
 
 class VerifyEmailWithOtpDto extends BaseDto<
   typeof verifyEmailWithOtpSchema.shape
