@@ -7,6 +7,8 @@ import searchCategoryDto from "./dto/searchCategory.dto.js";
 
 const router: Router = Router();
 
+router.get("/", catchAsyncErrors(controller.fetchCategories));
+
 router.post(
   "/create",
   validate(createCategoryDto),
@@ -14,7 +16,7 @@ router.post(
 );
 
 router.get(
-  "/",
+  "/search",
   validate(searchCategoryDto, "query"),
   catchAsyncErrors(controller.searchCategory),
 );

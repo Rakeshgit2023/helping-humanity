@@ -6,6 +6,16 @@ import type {
   SearchCategoryResponseInput,
 } from "./dto/searchCategory.dto.js";
 import type { CreateCategoryResponseInput } from "./dto/createCategory.dto.js";
+import type { FetchCategoriesResponseInput } from "./dto/fetchCategory.dto.js";
+
+export const fetchCategories = async (req: Request, res: Response) => {
+  const categories = await categoryService.fetchCategories();
+  const response: FetchCategoriesResponseInput = {
+    message: "Categories fetched successfully",
+    data: categories,
+  };
+  return ApiResponse.ok(res, response.message, response.data);
+};
 
 export const createCategory = async (req: Request, res: Response) => {
   const categories = await categoryService.createCategory(req.body);
