@@ -4,7 +4,21 @@ import type { CreateCategoryInput } from "./dto/createCategory.dto.js";
 import type { SearchCategoryInput } from "./dto/searchCategory.dto.js";
 import { withErrorHandling } from "../../comman/middleware/withErrorHandling.js";
 import { category } from "../../../db/schema.js";
-import { ilike } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
+
+export const fetchCategories = withErrorHandling(
+  "Get All Categories",
+  async () => {
+    const categories = await db
+      .select()
+      .from(category)
+      .where(eq(category.isActive, true));
+    if (categories.length === 0) {
+      throw ApiError.notFound("Not found any active categories");
+    }
+    return categories;
+  },
+);
 
 export const createCategory = withErrorHandling(
   "Create Category",

@@ -3,11 +3,31 @@ import {
   createCategoryResponseSchema,
   createCategorySchema,
 } from "../../module/category/dto/createCategory.dto.js";
+import { fetchCategoriesResponseSchema } from "../../module/category/dto/fetchCategory.dto.js";
 import {
   searchCategoryResponseSchema,
   searchCategorySchema,
 } from "../../module/category/dto/searchCategory.dto.js";
 import { registry } from "../registry.js";
+
+registry.registerPath({
+  method: "get",
+  path: "/category",
+  tags: ["Category"],
+  summary: "Get all active categories",
+  description: "Fetches all active categories available in the system.",
+  responses: {
+    200: {
+      description: "Categories fetched successfully",
+      content: {
+        "application/json": {
+          schema: fetchCategoriesResponseSchema,
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
 
 registry.registerPath({
   method: "post",
@@ -57,7 +77,7 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
-  path: "/category",
+  path: "/category/search",
   tags: ["Category"],
   summary: "Search categories",
   description:
