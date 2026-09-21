@@ -15,14 +15,16 @@ import {
   generateAccessToken,
   generateRefreshToken,
   hashToken,
+  verifyRefreshToken,
   type User,
 } from "../../comman/utils/jwt.js";
-import { generateOtp } from "../../comman/utils/helper.js";
+import { generateOtp, getClaims } from "../../comman/utils/helper.js";
 import { sendVerificationEmail } from "../../comman/utils/email.js";
 import type { SignInInput } from "./dto/signIn.dto.js";
 import type { VerifyEmailWithOtpInput } from "./dto/verifyEmailWithOtp.dto.js";
 import type { SendOtpForEmailVerificationInput } from "./dto/sendOtpForEmailVerification.dto.js";
 import { withErrorHandling } from "../../comman/middleware/withErrorHandling.js";
+import type { RefreshAccessTokenInput } from "./dto/refreshAccessToken.dto.js";
 
 // Register service function
 export const register = withErrorHandling(
@@ -174,13 +176,7 @@ export const signIn = withErrorHandling(
     }
 
     // JWT payload
-    const claims: User = {
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      email: user.email,
-      role: user.role,
-    };
+    const claims: User = getClaims(user);
 
     // Generate tokens
     const accessToken = generateAccessToken(claims);
@@ -341,5 +337,77 @@ export const sendOtpForEmailVerification = withErrorHandling(
       });
 
     await sendVerificationEmail(user.email, otp);
+  },
+);
+
+export const refreshAccessToken = withErrorHandling(
+  "Refresh Access Token",
+  async ({ token, sessionId }: RefreshAccessTokenInput, userAgent: string) => {
+    // 1. Verify refresh token signature + expiry
+    let decode: User;
+
+    try {
+      decode = verifyRefreshToken(token);
+    } catch {
+      throw ApiError.unauthorized("Invalid or expired refresh session");
+    }
+
+    // 2. Hash the token received from client
+    const refreshTokenHash = hashToken(token);
+
+    // 3. Find the exact active session
+    const [existingSession] = await db
+      .select()
+      .from(sessions)
+      .where(
+        and(
+          eq(sessions.id, sessionId),
+          eq(sessions.userId, decode.id),
+          eq(sessions.refreshTokenHash, hashToken(token)),
+          eq(sessions.userAgent, userAgent),
+          gt(sessions.expiresAt, new Date()),
+        ),
+      );
+
+    if (!existingSession) {
+      throw ApiError.unauthorized("Invalid or expired refresh session");
+    }
+
+    // 4. Generate new tokens
+    const claims: User = getClaims(decode);
+    const newAccessToken = generateAccessToken(claims);
+    const newRefreshToken = generateRefreshToken(claims);
+
+    const newRefreshTokenHash = hashToken(newRefreshToken);
+
+    // 5. Rotate refresh token atomically
+    const [updatedSession] = await db
+      .update(sessions)
+      .set({
+        refreshTokenHash: newRefreshTokenHash,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      })
+      .where(
+        and(
+          eq(sessions.id, sessionId),
+          eq(sessions.userId, decode.id),
+          eq(sessions.refreshTokenHash, refreshTokenHash),
+        ),
+      )
+      .returning({
+        id: sessions.id,
+      });
+
+    // 6. If old token was already rotated/used
+    if (!updatedSession) {
+      throw ApiError.unauthorized("Refresh token already used or invalid");
+    }
+
+    return {
+      user: decode,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+      sessionId: updatedSession.id,
+    };
   },
 );

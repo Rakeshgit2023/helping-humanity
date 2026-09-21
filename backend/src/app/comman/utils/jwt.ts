@@ -2,14 +2,14 @@ import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import { env } from "../../../env.js";
 import type { StringValue } from "ms";
-import { roleValues } from "./constant.js";
+import { type Role } from "./constant.js";
 
 export interface User {
   id: string;
   firstName: string;
   lastName: string | null;
   email: string;
-  role: "user" | "volunteer" | "admin";
+  role: Role;
 }
 
 export const hashToken = (token: string) =>
