@@ -5,6 +5,10 @@ import type { RegisterResponse } from "./dto/register.dto.js";
 import type { SignInResponseInput } from "./dto/signIn.dto.js";
 import type { verifyEmailWithOtpResponseInput } from "./dto/verifyEmailWithOtp.dto.js";
 import type { SendOtpForEmailVerificationResponseInput } from "./dto/sendOtpForEmailVerification.dto.js";
+import type {
+  RefreshAccessTokenInput,
+  RefreshAccessTokenResponseInput,
+} from "./dto/refreshAccessToken.dto.js";
 
 export const register = async (req: Request, res: Response) => {
   const user = await authService.register(req.body);
@@ -46,4 +50,18 @@ export const sendOtpForEmailVerification = async (
     data: null,
   };
   return ApiResponse.ok(res, response.message);
+};
+
+export const refreshAccessToken = async (req: Request, res: Response) => {
+  const query = req.validatedQuery as RefreshAccessTokenInput;
+  const userData = await authService.refreshAccessToken(
+    query,
+    req.get("user-agent") || "",
+  );
+
+  const response: RefreshAccessTokenResponseInput = {
+    message: "Access token refreshed successfully",
+    data: userData,
+  };
+  return ApiResponse.ok(res, response.message, response.data);
 };

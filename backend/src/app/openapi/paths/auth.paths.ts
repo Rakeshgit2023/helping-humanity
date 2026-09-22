@@ -16,6 +16,10 @@ import {
   sendOtpForEmailVerificationResponseSchema,
   sendOtpForEmailVerificationSchema,
 } from "../../module/auth/dto/sendOtpForEmailVerification.dto.js";
+import {
+  RefreshAccessTokenResponseSchema,
+  refreshAccessTokenSchema,
+} from "../../module/auth/dto/refreshAccessToken.dto.js";
 
 registry.registerPath({
   method: "post",
@@ -167,6 +171,29 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: sendOtpForEmailVerificationResponseSchema,
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/auth/refresh",
+  tags: ["Auth"],
+  summary: "Refresh access token",
+  description:
+    "Generates a new access token and refresh token using a valid refresh token and session ID. The refresh token is rotated after successful validation.",
+  request: {
+    query: refreshAccessTokenSchema,
+  },
+  responses: {
+    200: {
+      description: "Access token refreshed successfully",
+      content: {
+        "application/json": {
+          schema: RefreshAccessTokenResponseSchema,
         },
       },
     },
