@@ -15,7 +15,10 @@ import {
 } from "drizzle-orm/pg-core";
 import {
   booldGroupValues,
+  broadcastStatusValues,
   genderValues,
+  priorityValues,
+  requestStatusValues,
   roleValues,
 } from "../app/comman/utils/constant.js";
 
@@ -24,6 +27,15 @@ export const roleEnum = pgEnum("role", roleValues);
 export const genderEnum = pgEnum("gender", genderValues);
 
 export const bloodGroupEnum = pgEnum("blood_group", booldGroupValues);
+
+export const priorityEnum = pgEnum("priority", priorityValues);
+
+export const requestStatusEnum = pgEnum("request_status", requestStatusValues);
+
+export const broadcastStatusEnum = pgEnum(
+  "broadcast_status",
+  broadcastStatusValues,
+);
 
 export const users = pgTable(
   "users",
@@ -145,3 +157,107 @@ export const volunteerInterests = pgTable(
   },
   (t) => [primaryKey({ columns: [t.volunteerId, t.categoryId] })],
 );
+
+// ============================================================
+// REQUESTS
+// ============================================================
+
+export const requests = pgTable(
+  "requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requesterId: uuid("requester_id")
+      .notNull()
+      .references(() => users.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    description: text("description"),
+
+    // location snapshot at request time (the incident location, not the
+    // volunteer's live position, which moves)
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    address: text("address"),
+
+    // only meaningful for category = blood_donation
+    bloodGroupNeeded: bloodGroupEnum("blood_group_needed"),
+    hospitalName: varchar("hospital_name", { length: 160 }),
+
+    priority: priorityEnum("priority").notNull().default("normal"),
+    status: requestStatusEnum("status").notNull().default("broadcasted"),
+
+    broadcastRadiusKm: doublePrecision("broadcast_radius_km")
+      .notNull()
+      .default(3),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date(),
+    ),
+    expiresAt: timestamp("expires_at", { withTimezone: true }), // SLA deadline, esp. for urgent/blood
+  },
+  (t) => [
+    index("requests_status_idx").on(t.status),
+    index("requests_category_idx").on(t.categoryId),
+    index("requests_requester_idx").on(t.requesterId),
+    index("requests_priority_idx").on(t.priority),
+  ],
+);
+
+export const requestPhotos = pgTable(
+  "request_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    photoUrl: text("photo_url").notNull(),
+  },
+  (t) => [index("request_photos_request_idx").on(t.requestId)],
+);
+
+export const requestBroadcasts = pgTable(
+  "request_broadcasts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    volunteerId: uuid("volunteer_id")
+      .notNull()
+      .references(() => users.id),
+    distanceKm: doublePrecision("distance_km"),
+    status: broadcastStatusEnum("status").notNull().default("sent"),
+    notifiedAt: timestamp("notified_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("broadcasts_request_idx").on(t.requestId),
+    index("broadcasts_volunteer_idx").on(t.volunteerId),
+    uniqueIndex("broadcasts_request_volunteer_uidx").on(
+      t.requestId,
+      t.volunteerId,
+    ),
+  ],
+);
+
+export const requestAssignments = pgTable("request_assignments", {
+  requestId: uuid("request_id")
+    .primaryKey()
+    .references(() => requests.id, { onDelete: "cascade" }),
+  volunteerId: uuid("volunteer_id")
+    .notNull()
+    .references(() => users.id),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  inProgressAt: timestamp("in_progress_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+});
