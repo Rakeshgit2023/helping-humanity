@@ -20,6 +20,7 @@ import {
   RefreshAccessTokenResponseSchema,
   refreshAccessTokenSchema,
 } from "../../module/auth/dto/refreshAccessToken.dto.js";
+import z from "zod";
 
 registry.registerPath({
   method: "post",
@@ -194,6 +195,34 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: RefreshAccessTokenResponseSchema,
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/auth/logout",
+  tags: ["Auth"],
+  summary: "Log out user",
+  description:
+    "Logs out the authenticated user by invalidating all active login sessions associated with the user.",
+  security: [
+    {
+      bearerAuth: [],
+    },
+  ],
+  responses: {
+    200: {
+      description: "User logged out successfully",
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+            data: z.null(),
+          }),
         },
       },
     },

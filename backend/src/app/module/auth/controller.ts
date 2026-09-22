@@ -65,3 +65,8 @@ export const refreshAccessToken = async (req: Request, res: Response) => {
   };
   return ApiResponse.ok(res, response.message, response.data);
 };
+
+export const logout = async (req: Request, res: Response) => {
+  await authService.logout(req.user);
+  return ApiResponse.ok(res, "User logout successful");
+};
