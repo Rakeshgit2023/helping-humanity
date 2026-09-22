@@ -411,3 +411,7 @@ export const refreshAccessToken = withErrorHandling(
     };
   },
 );
+
+export const logout = withErrorHandling("Log out", async (user: User) => {
+  await db.delete(sessions).where(eq(sessions.userId, user.id));
+});

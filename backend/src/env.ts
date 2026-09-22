@@ -14,6 +14,9 @@ const envSchema = z.object({
   SMTP_PASS: z.string(),
   SMTP_FROM_NAME: z.string(),
   CLIENT_URL: z.string(),
+  CLOUDINARY_CLOUD_NAME: z.string(),
+  CLOUDINARY_API_KEY: z.string(),
+  CLOUDINARY_API_SECRET: z.string(),
 });
 
 const createEnv = (env: NodeJS.ProcessEnv) => {

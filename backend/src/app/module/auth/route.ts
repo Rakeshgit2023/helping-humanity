@@ -7,6 +7,7 @@ import sendOtpForEmailVerificationDto from "./dto/sendOtpForEmailVerification.dt
 import verifyEmailWithOtpDto from "./dto/verifyEmailWithOtp.dto.js";
 import { catchAsyncErrors } from "../../comman/middleware/catchAsyncError.js";
 import refreshAccessTokenDto from "./dto/refreshAccessToken.dto.js";
+import { isAuthenticated } from "../../comman/middleware/auth.middleware.js";
 
 const router: Router = Router();
 
@@ -36,5 +37,7 @@ router.get(
   validate(refreshAccessTokenDto, "query"),
   catchAsyncErrors(controller.refreshAccessToken),
 );
+
+router.get("/logout", isAuthenticated, catchAsyncErrors(controller.logout));
 
 export default router;
