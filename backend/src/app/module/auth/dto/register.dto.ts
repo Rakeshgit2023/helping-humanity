@@ -1,7 +1,7 @@
 import z from "zod";
 import BaseDto from "../../../comman/dto/base.dto.js";
 import {
-  booldGroupValues,
+  bloodGroupValues,
   genderValues,
   roleValues,
 } from "../../../comman/utils/constant.js";
@@ -24,7 +24,9 @@ const baseRegisterSchema = z.object({
     .string({
       error: "Date of birth is required",
     })
-    .regex(/^\d{2}-\d{2}-\d{4}$/, "Date of birth must be in DD-MM-YYYY format"),
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be in YYYY-MM-DD format")
+    .refine((v) => !Number.isNaN(Date.parse(v)), "Invalid date")
+    .refine((v) => new Date(v) < new Date(), "DOB must be in the past"),
 
   phone: z
     .string({
@@ -51,7 +53,7 @@ const baseRegisterSchema = z.object({
       /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/,
       "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character",
     ),
-  bloodGroup: z.enum(booldGroupValues).optional(),
+  bloodGroup: z.enum(bloodGroupValues).optional(),
   interests: z
     .array(z.uuid("Each interest must be a valid category id"))
     .min(1, "At least 1 interest is required")
