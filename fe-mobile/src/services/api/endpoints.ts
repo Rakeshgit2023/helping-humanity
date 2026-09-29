@@ -4,6 +4,8 @@ export const ENDPOINTS = {
     register: '/auth/register',
     refresh: '/auth/refresh',
     logout: '/auth/logout',
+    sendOtp: '/auth/sendOtpForEmailVerification',
+    verifyEmail: '/auth/verifyEmailWithOtp',
   },
   category: {
     list: '/category',

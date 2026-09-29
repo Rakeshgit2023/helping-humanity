@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Mail } from 'lucide-react-native';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -16,6 +16,7 @@ import { loginSchema, type LoginFormValues } from '@/utils/validation';
 export default function LoginScreen() {
   const { login } = useAuth();
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = useState<string | null>(null);
 
   const { control, handleSubmit, formState } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -24,10 +25,15 @@ export default function LoginScreen() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setSubmitError(null);
+    setUnverifiedEmail(null);
     try {
       await login(values);
     } catch (error) {
-      setSubmitError(toAppError(error).message);
+      const appError = toAppError(error);
+      setSubmitError(appError.message);
+      if (appError.message.toLowerCase().includes('verify your email')) {
+        setUnverifiedEmail(values.email);
+      }
     }
   };
 
@@ -65,6 +71,15 @@ export default function LoginScreen() {
           </Pressable>
 
           {submitError ? <Text className="text-base text-clay">{submitError}</Text> : null}
+          {unverifiedEmail ? (
+            <Pressable
+              onPress={() =>
+                router.push({ pathname: '/(auth)/verify-email', params: { email: unverifiedEmail } })
+              }
+            >
+              <Text className="text-sm font-bold text-teal">Verify your email now</Text>
+            </Pressable>
+          ) : null}
 
           <Pressable
             onPress={handleSubmit(onSubmit)}

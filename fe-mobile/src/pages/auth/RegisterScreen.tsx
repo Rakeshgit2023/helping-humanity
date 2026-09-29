@@ -3,7 +3,7 @@ import { Link, router } from 'expo-router';
 import { CheckSquare, Heart, HeartHandshake, Mail, Phone, Square, User } from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AuthHeader } from '@/features/auth/components/AuthHeader';
 import { AuthPasswordField } from '@/features/auth/components/AuthPasswordField';
@@ -79,8 +79,7 @@ export default function RegisterScreen() {
         bloodGroup: values.role === 'volunteer' ? values.bloodGroup : undefined,
         interests: values.role === 'volunteer' ? values.interests : undefined,
       });
-      Alert.alert('Registration successful', 'Please log in with your new account.');
-      router.replace('/(auth)/login');
+      router.replace({ pathname: '/(auth)/verify-email', params: { email: values.email } });
     } catch (error) {
       setSubmitError(toAppError(error).message);
     }

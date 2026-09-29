@@ -44,3 +44,17 @@ export interface RegisterResponse {
   dob: string | null;
   role: UserRole;
 }
+
+export interface SendOtpPayload {
+  email: string;
+}
+
+export interface VerifyOtpPayload {
+  email: string;
+  otp: string;
+}
+
+export interface VerifyOtpResponse {
+  userId: string;
+  email: string;
+}

@@ -5,6 +5,9 @@ import type {
   LoginResponse,
   RegisterPayload,
   RegisterResponse,
+  SendOtpPayload,
+  VerifyOtpPayload,
+  VerifyOtpResponse,
 } from '@/features/auth/types/auth.types';
 
 interface ApiEnvelope<T> {
@@ -31,5 +34,17 @@ export const authService = {
 
   async logout(): Promise<void> {
     await apiClient.get(ENDPOINTS.auth.logout);
+  },
+
+  async sendOtpForEmailVerification(payload: SendOtpPayload): Promise<void> {
+    await apiClient.post(ENDPOINTS.auth.sendOtp, payload);
+  },
+
+  async verifyEmailWithOtp(payload: VerifyOtpPayload): Promise<VerifyOtpResponse> {
+    const { data } = await apiClient.post<{ message: string; data: VerifyOtpResponse }>(
+      ENDPOINTS.auth.verifyEmail,
+      payload,
+    );
+    return data.data;
   },
 };

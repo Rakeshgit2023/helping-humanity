@@ -4,6 +4,13 @@ export const PHONE_RE = /^[6-9]\d{9}$/;
 export const DOB_RE = /^\d{2}-\d{2}-\d{4}$/;
 export const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/;
 
+export const otpSchema = z.object({
+  otp: z
+    .string()
+    .length(6, 'OTP must be 6 digits')
+    .regex(/^\d{6}$/, 'OTP must contain only numbers'),
+});
+
 export const loginSchema = z.object({
   email: z.string().min(1, 'Enter your email').email('Enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
@@ -68,5 +75,6 @@ export const registerSchema = z
     }
   });
 
+export type OtpFormValues = z.infer<typeof otpSchema>;
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterFormValues = z.infer<typeof registerSchema>;
