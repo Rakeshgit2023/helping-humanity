@@ -3,7 +3,7 @@ export type Role = (typeof roleValues)[number];
 
 export const genderValues = ["male", "female", "other"] as const;
 
-export const booldGroupValues = [
+export const bloodGroupValues = [
   "A+",
   "A-",
   "B+",
