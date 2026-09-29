@@ -1,18 +1,70 @@
+import type { Request, Response, NextFunction } from "express";
 import multer from "multer";
 import ApiError from "../utils/api.error.js";
 
+type MediaType = "image" | "video" | "both";
+
+const mediaLabel: Record<MediaType, string> = {
+  image: "image",
+  video: "video",
+  both: "file",
+};
+
 const storage = multer.memoryStorage();
 
-export const upload = multer({
-  storage,
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5 MB per image
-  },
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
-      cb(null, true);
-    } else {
-      cb(ApiError.badRequest("Only image files are allowed"));
+const allowedMimeTypes: Record<MediaType, string[]> = {
+  image: ["image/jpeg", "image/png", "image/webp"],
+
+  video: ["video/mp4", "video/mpeg", "video/quicktime", "video/webm"],
+
+  both: [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "video/mp4",
+    "video/mpeg",
+    "video/quicktime",
+    "video/webm",
+  ],
+};
+
+export const upload = (
+  mediaType: MediaType = "image",
+  maxFiles: number = 2,
+) => {
+  return multer({
+    storage,
+
+    limits: {
+      fileSize: 5 * 1024 * 1024, // 5 MB per file
+      files: maxFiles,
+    },
+
+    fileFilter: (_req, file, cb) => {
+      if (allowedMimeTypes[mediaType].includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(ApiError.badRequest(`Only ${mediaType} files are allowed`));
+      }
+    },
+  });
+};
+
+export const requireFiles = (
+  mediaType: MediaType = "image",
+  minFiles: number = 1,
+) => {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const files = req.files as Express.Multer.File[] | undefined;
+
+    if (!files || files.length < minFiles) {
+      const label = mediaLabel[mediaType];
+
+      throw ApiError.badRequest(
+        `At least ${minFiles} ${label}${minFiles > 1 ? "s" : ""} is required`,
+      );
     }
-  },
-});
+
+    next();
+  };
+};
