@@ -3,7 +3,7 @@ import { Link, router } from 'expo-router';
 import { Mail } from 'lucide-react-native';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AuthHeader } from '@/features/auth/components/AuthHeader';
 import { AuthPasswordField } from '@/features/auth/components/AuthPasswordField';
@@ -84,11 +84,14 @@ export default function LoginScreen() {
           <Pressable
             onPress={handleSubmit(onSubmit)}
             disabled={formState.isSubmitting}
-            className={`mt-1 items-center rounded-xl bg-teal py-4 ${
-              formState.isSubmitting ? 'opacity-50' : 'active:opacity-90'
+            className={`mt-1 flex-row items-center justify-center gap-2 rounded-xl bg-teal py-4 ${
+              formState.isSubmitting ? 'opacity-70' : 'active:opacity-90'
             }`}
           >
-            <Text className="text-base font-bold text-white">Log In</Text>
+            {formState.isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : null}
+            <Text className="text-base font-bold text-white">
+              {formState.isSubmitting ? 'Logging in…' : 'Log In'}
+            </Text>
           </Pressable>
         </View>
 

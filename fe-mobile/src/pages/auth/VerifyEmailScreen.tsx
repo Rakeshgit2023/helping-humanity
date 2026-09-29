@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { ShieldCheck } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 
 import { AuthHeader } from '@/features/auth/components/AuthHeader';
 import { AuthTextField } from '@/features/auth/components/AuthTextField';
@@ -107,16 +107,24 @@ export default function VerifyEmailScreen() {
           <Pressable
             onPress={handleSubmit(onSubmit)}
             disabled={formState.isSubmitting}
-            className={`mt-1 items-center rounded-xl bg-teal py-4 ${
-              formState.isSubmitting ? 'opacity-50' : 'active:opacity-90'
+            className={`mt-1 flex-row items-center justify-center gap-2 rounded-xl bg-teal py-4 ${
+              formState.isSubmitting ? 'opacity-70' : 'active:opacity-90'
             }`}
           >
-            <Text className="text-base font-bold text-white">Verify Email</Text>
+            {formState.isSubmitting ? <ActivityIndicator color="#FFFFFF" /> : null}
+            <Text className="text-base font-bold text-white">
+              {formState.isSubmitting ? 'Verifying…' : 'Verify Email'}
+            </Text>
           </Pressable>
 
-          <Pressable onPress={onResend} disabled={isResending || cooldown > 0} className="items-center py-2">
+          <Pressable
+            onPress={onResend}
+            disabled={isResending || cooldown > 0}
+            className="flex-row items-center justify-center gap-2 py-2"
+          >
+            {isResending ? <ActivityIndicator color="#0B3B78" size="small" /> : null}
             <Text className={`text-sm font-semibold ${cooldown > 0 ? 'text-ink-soft' : 'text-teal'}`}>
-              {cooldown > 0 ? `Resend OTP in ${cooldown}s` : 'Resend OTP'}
+              {isResending ? 'Sending…' : cooldown > 0 ? `Resend OTP in ${cooldown}s` : 'Resend OTP'}
             </Text>
           </Pressable>
         </View>
