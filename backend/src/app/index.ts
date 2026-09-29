@@ -9,7 +9,9 @@ import { errorHandler } from "./comman/middleware/error.middleware.js";
 
 export const createExpressApplication = (): Application => {
   const app = express();
+
   app.use(express.json());
+  app.use(express.urlencoded({ extended: true }));
 
   app.get("/health", (_, res) => {
     res.status(200).json({ status: "ok", healthy: true });

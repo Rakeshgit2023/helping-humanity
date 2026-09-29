@@ -14,7 +14,7 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import {
-  booldGroupValues,
+  bloodGroupValues,
   broadcastStatusValues,
   genderValues,
   priorityValues,
@@ -26,7 +26,7 @@ export const roleEnum = pgEnum("role", roleValues);
 
 export const genderEnum = pgEnum("gender", genderValues);
 
-export const bloodGroupEnum = pgEnum("blood_group", booldGroupValues);
+export const bloodGroupEnum = pgEnum("blood_group", bloodGroupValues);
 
 export const priorityEnum = pgEnum("priority", priorityValues);
 
