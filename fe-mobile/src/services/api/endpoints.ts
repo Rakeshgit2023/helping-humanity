@@ -9,6 +9,7 @@ export const ENDPOINTS = {
   },
   category: {
     list: '/category',
+    search: '/category/search',
   },
   user: {
     profile: '/users/me',

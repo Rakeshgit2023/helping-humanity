@@ -1,8 +1,37 @@
 import { z } from 'zod';
 
 export const PHONE_RE = /^[6-9]\d{9}$/;
-export const DOB_RE = /^\d{2}-\d{2}-\d{4}$/;
+export const DOB_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/;
+
+export function isValidCalendarDate(isoDate: string): boolean {
+  if (!DOB_RE.test(isoDate)) return false;
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year &&
+    date.getUTCMonth() === month - 1 &&
+    date.getUTCDate() === day &&
+    date.getTime() <= Date.now()
+  );
+}
+
+export interface DobParts {
+  year: string;
+  month: string;
+  day: string;
+}
+
+/** Splits the combined YYYY-MM-DD form value into its three editable parts. */
+export function splitDob(value: string): DobParts {
+  const [year = '', month = '', day = ''] = value.split('-');
+  return { year, month, day };
+}
+
+/** Joins the three DOB parts back into the combined YYYY-MM-DD form value. */
+export function joinDob(parts: DobParts): string {
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 
 export const otpSchema = z.object({
   otp: z
@@ -22,7 +51,10 @@ export const registerSchema = z
     lastName: z.string().min(2, 'Last name must be at least 2 characters'),
     email: z.string().min(1, 'Enter your email').email('Enter a valid email address'),
     phone: z.string().regex(PHONE_RE, 'Enter a valid 10-digit phone number'),
-    dob: z.string().regex(DOB_RE, 'Use DD-MM-YYYY format'),
+    dob: z
+      .string()
+      .regex(DOB_RE, 'Use YYYY-MM-DD format')
+      .refine(isValidCalendarDate, 'Enter a valid date of birth'),
     gender: z.enum(['male', 'female', 'other']),
     password: z
       .string()

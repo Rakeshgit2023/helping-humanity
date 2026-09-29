@@ -9,4 +9,12 @@ export const categoryService = {
     );
     return data.data;
   },
+
+  async searchCategories(name: string, signal?: AbortSignal): Promise<Category[]> {
+    const { data } = await apiClient.get<{ message: string; data: Category[] }>(
+      ENDPOINTS.category.search,
+      { params: { name }, signal },
+    );
+    return data.data;
+  },
 };

@@ -1,20 +1,31 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, router } from 'expo-router';
-import { CheckSquare, Heart, HeartHandshake, Mail, Phone, Square, User } from 'lucide-react-native';
+import {
+  CheckSquare,
+  Heart,
+  HeartHandshake,
+  Mail,
+  Phone,
+  Search,
+  Square,
+  User,
+  X,
+} from 'lucide-react-native';
 import { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { AuthHeader } from '@/features/auth/components/AuthHeader';
 import { AuthPasswordField } from '@/features/auth/components/AuthPasswordField';
 import { AuthTextField } from '@/features/auth/components/AuthTextField';
 import { Screen } from '@/components/ui/Screen';
-import { useCategories } from '@/features/category/hooks/useCategories';
+import { useCategorySearch } from '@/features/category/hooks/useCategorySearch';
+import type { Category } from '@/features/category/types/category.types';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type { BloodGroup, Gender } from '@/features/auth/types/auth.types';
 import { brand } from '@/theme';
 import { toAppError } from '@/utils/errorHandler';
-import { registerSchema, type RegisterFormValues } from '@/utils/validation';
+import { joinDob, registerSchema, splitDob, type RegisterFormValues } from '@/utils/validation';
 
 type RegisterRole = 'user' | 'volunteer';
 
@@ -30,11 +41,24 @@ const GENDER_OPTIONS: { id: Gender; label: string }[] = [
 ];
 
 const BLOOD_GROUPS: BloodGroup[] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+const MAX_INTERESTS = 5;
+const MAX_DROPDOWN_RESULTS = 3;
 
 export default function RegisterScreen() {
   const { register } = useAuth();
-  const { data: categories, isLoading: categoriesLoading, isError: categoriesError } = useCategories();
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
+  const isSearchingCategories = categoryQuery.trim().length >= 2;
+  const {
+    data: searchedCategories,
+    isFetching: isSearchingFetching,
+    isError: isSearchError,
+  } = useCategorySearch(categoryQuery);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const dropdownResults = (searchedCategories ?? [])
+    .filter((category) => !selectedCategories.some((selected) => selected.id === category.id))
+    .slice(0, MAX_DROPDOWN_RESULTS);
 
   const { control, handleSubmit, watch, setValue, formState } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -57,11 +81,28 @@ export default function RegisterScreen() {
   const role = watch('role');
   const gender = watch('gender');
   const bloodGroup = watch('bloodGroup');
-  const interests = watch('interests');
 
-  const toggleInterest = (id: string) => {
-    const next = interests.includes(id) ? interests.filter((x) => x !== id) : [...interests, id];
-    setValue('interests', next, { shouldValidate: true });
+  const selectCategory = (category: Category) => {
+    if (selectedCategories.some((selected) => selected.id === category.id)) return;
+    if (selectedCategories.length >= MAX_INTERESTS) return;
+    const next = [...selectedCategories, category];
+    setSelectedCategories(next);
+    setValue(
+      'interests',
+      next.map((c) => c.id),
+      { shouldValidate: true },
+    );
+    setCategoryQuery('');
+  };
+
+  const removeCategory = (id: string) => {
+    const next = selectedCategories.filter((c) => c.id !== id);
+    setSelectedCategories(next);
+    setValue(
+      'interests',
+      next.map((c) => c.id),
+      { shouldValidate: true },
+    );
   };
 
   const onSubmit = async (values: RegisterFormValues) => {
@@ -155,11 +196,65 @@ export default function RegisterScreen() {
             keyboardType="email-address"
             placeholder="you@example.com"
           />
-          <AuthTextField
+          <Controller
             control={control}
             name="dob"
-            label="Date of birth"
-            placeholder="DD-MM-YYYY"
+            render={({ field: { onChange, onBlur, value }, fieldState: { error } }) => {
+              const { year, month, day } = splitDob(value);
+              const borderClass = error ? 'border-clay' : 'border-line';
+
+              const updatePart = (part: keyof ReturnType<typeof splitDob>, digits: string) => {
+                const next = { year, month, day, [part]: digits.replace(/\D/g, '') };
+                onChange(joinDob(next));
+              };
+
+              return (
+                <View>
+                  <Text className="mb-2 text-sm font-bold text-ink">Date of birth</Text>
+                  <View className="flex-row items-center gap-2">
+                    <View className={`flex-[1.4] rounded-xl border bg-white px-4 ${borderClass}`}>
+                      <TextInput
+                        value={year}
+                        onChangeText={(text) => updatePart('year', text.slice(0, 4))}
+                        onBlur={onBlur}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                        placeholder="YYYY"
+                        placeholderTextColor={brand.inkSoft}
+                        className="py-3.5 text-base text-ink"
+                      />
+                    </View>
+                    <Text className="text-base font-bold text-ink-soft">-</Text>
+                    <View className={`flex-1 rounded-xl border bg-white px-4 ${borderClass}`}>
+                      <TextInput
+                        value={month}
+                        onChangeText={(text) => updatePart('month', text.slice(0, 2))}
+                        onBlur={onBlur}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        placeholder="MM"
+                        placeholderTextColor={brand.inkSoft}
+                        className="py-3.5 text-base text-ink"
+                      />
+                    </View>
+                    <Text className="text-base font-bold text-ink-soft">-</Text>
+                    <View className={`flex-1 rounded-xl border bg-white px-4 ${borderClass}`}>
+                      <TextInput
+                        value={day}
+                        onChangeText={(text) => updatePart('day', text.slice(0, 2))}
+                        onBlur={onBlur}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        placeholder="DD"
+                        placeholderTextColor={brand.inkSoft}
+                        className="py-3.5 text-base text-ink"
+                      />
+                    </View>
+                  </View>
+                  {error ? <Text className="mt-1.5 text-xs text-clay">{error.message}</Text> : null}
+                </View>
+              );
+            }}
           />
 
           <View>
@@ -230,43 +325,74 @@ export default function RegisterScreen() {
           ) : null}
 
           {role === 'volunteer' ? (
-            <View>
+            <View className="z-10">
               <Text className="mb-2 text-sm font-bold text-ink">
                 What do you want to help with?
               </Text>
 
-              {categoriesLoading ? (
-                <Text className="text-xs text-ink-soft">Loading categories…</Text>
-              ) : categoriesError ? (
-                <Text className="text-xs text-clay">
-                  Couldn&apos;t load categories. Check your connection and try again.
-                </Text>
-              ) : !categories || categories.length === 0 ? (
-                <Text className="text-xs text-ink-soft">No categories available right now.</Text>
-              ) : (
-                <View className="flex-row flex-wrap gap-2">
-                  {categories.map((category) => {
-                    const active = interests.includes(category.id);
-                    return (
-                      <Pressable
-                        key={category.id}
-                        onPress={() => toggleInterest(category.id)}
-                        className="rounded-full border px-3.5 py-2"
-                        style={{
-                          backgroundColor: active ? brand.teal : '#FFFFFF',
-                          borderColor: active ? brand.teal : brand.line,
-                        }}
-                      >
-                        <Text
-                          className="text-sm font-semibold"
-                          style={{ color: active ? '#FFFFFF' : brand.ink }}
-                        >
-                          {category.name}
-                        </Text>
+              {selectedCategories.length > 0 ? (
+                <View className="mb-3 flex-row flex-wrap gap-2">
+                  {selectedCategories.map((category) => (
+                    <View
+                      key={category.id}
+                      className="flex-row items-center gap-1.5 rounded-full border px-3 py-1.5"
+                      style={{ backgroundColor: brand.teal, borderColor: brand.teal }}
+                    >
+                      <Text className="text-sm font-semibold text-white">{category.name}</Text>
+                      <Pressable onPress={() => removeCategory(category.id)} hitSlop={6}>
+                        <X size={14} color="#FFFFFF" />
                       </Pressable>
-                    );
-                  })}
+                    </View>
+                  ))}
                 </View>
+              ) : null}
+
+              {selectedCategories.length < MAX_INTERESTS ? (
+                <View className="relative">
+                  <View className="flex-row items-center gap-2.5 rounded-xl border border-line bg-white px-4">
+                    <Search size={16} color={brand.inkSoft} />
+                    <TextInput
+                      value={categoryQuery}
+                      onChangeText={setCategoryQuery}
+                      placeholder="Search categories (min 2 letters)"
+                      placeholderTextColor={brand.inkSoft}
+                      autoCapitalize="none"
+                      className="flex-1 py-3 text-sm text-ink"
+                    />
+                    {isSearchingFetching ? (
+                      <ActivityIndicator size="small" color={brand.teal} />
+                    ) : null}
+                  </View>
+
+                  {isSearchingCategories ? (
+                    <View
+                      className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-line bg-white"
+                      style={{ elevation: 4, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 6 }}
+                    >
+                      {isSearchingFetching && dropdownResults.length === 0 ? (
+                        <Text className="px-4 py-3 text-xs text-ink-soft">Searching…</Text>
+                      ) : isSearchError ? (
+                        <Text className="px-4 py-3 text-xs text-clay">Couldn&apos;t search categories.</Text>
+                      ) : dropdownResults.length === 0 ? (
+                        <Text className="px-4 py-3 text-xs text-ink-soft">No categories match.</Text>
+                      ) : (
+                        dropdownResults.map((category, index) => (
+                          <Pressable
+                            key={category.id}
+                            onPress={() => selectCategory(category)}
+                            className={`px-4 py-3 active:bg-teal-soft ${
+                              index > 0 ? 'border-t border-line' : ''
+                            }`}
+                          >
+                            <Text className="text-sm font-semibold text-ink">{category.name}</Text>
+                          </Pressable>
+                        ))
+                      )}
+                    </View>
+                  ) : null}
+                </View>
+              ) : (
+                <Text className="text-xs text-ink-soft">You&apos;ve picked the max of {MAX_INTERESTS}.</Text>
               )}
 
               {formState.errors.interests ? (
