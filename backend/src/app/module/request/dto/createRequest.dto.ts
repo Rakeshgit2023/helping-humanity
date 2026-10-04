@@ -5,10 +5,15 @@ import {
   priorityValues,
 } from "../../../comman/utils/constant.js";
 
-const categorySchema = z.object({
-  id: z.uuid("Invalid category ID"),
-  name: z.string().min(1, "Category name is required"),
-});
+const categorySchema = z.object(
+  {
+    id: z.uuid("Invalid category ID"),
+    name: z
+      .string("Category name is required")
+      .min(1, "Category name is required"),
+  },
+  { error: "Category is required" },
+);
 
 const baseCreateRequestSchema = z.object({
   category: z.preprocess((value) => {

@@ -51,20 +51,16 @@ export const upload = (
 };
 
 export const requireFiles = (
+  req: Request,
   mediaType: MediaType = "image",
   minFiles: number = 1,
-) => {
-  return (req: Request, _res: Response, next: NextFunction) => {
-    const files = req.files as Express.Multer.File[] | undefined;
+): string | null => {
+  const files = req.files as Express.Multer.File[] | undefined;
 
-    if (!files || files.length < minFiles) {
-      const label = mediaLabel[mediaType];
+  if (!files || files.length < minFiles) {
+    const label = mediaLabel[mediaType];
+    return `At least ${minFiles} ${label}${minFiles > 1 ? "s" : ""} is required`;
+  }
 
-      throw ApiError.badRequest(
-        `At least ${minFiles} ${label}${minFiles > 1 ? "s" : ""} is required`,
-      );
-    }
-
-    next();
-  };
+  return null;
 };

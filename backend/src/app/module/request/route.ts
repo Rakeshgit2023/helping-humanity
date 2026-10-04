@@ -15,8 +15,7 @@ router.post(
   "/",
   isAuthenticated,
   upload("image", 2).array("files"),
-  requireFiles(),
-  validate(createRequestDto),
+  validate(createRequestDto, "body", true),
   catchAsyncErrors(controller.createRequest),
 );
 

@@ -65,6 +65,24 @@ export const users = pgTable(
   ],
 );
 
+export const userLocations = pgTable(
+  "user_locations",
+  {
+    // primary key hi foreign key: isse one-to-one guarantee hota hai
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("user_locations_lat_lng_idx").on(t.lat, t.lng)],
+);
+
 export const emailVerificationOtps = pgTable(
   "email_verification_otps",
   {
@@ -119,9 +137,6 @@ export const volunteerProfiles = pgTable(
     isVerified: boolean("is_verified").notNull().default(false), // admin-approved
     isAvailable: boolean("is_available").notNull().default(true), // on/off duty toggle
     bloodGroup: bloodGroupEnum("blood_group"), // relevant if interested in blood_donation
-    lastLat: doublePrecision("last_lat"),
-    lastLng: doublePrecision("last_lng"),
-    lastLocationAt: timestamp("last_location_at", { withTimezone: true }),
     ratingAvg: doublePrecision("rating_avg").notNull().default(0),
     ratingCount: integer("rating_count").notNull().default(0),
     avgResponseMinutes: integer("avg_response_minutes"), // powers the "Avg response" stat
