@@ -1,6 +1,7 @@
 import type { Server as HttpServer } from "http";
 import { Server } from "socket.io";
-// import { socketAuth } from "./socket.auth.js";
+import { socketAuth } from "../comman/middleware/socket.auth.middleware.js";
+import { publishLocation } from "../comman/kafka/location.producer.js";
 
 let io: Server | null = null;
 
@@ -9,11 +10,16 @@ export const initSocket = (httpServer: HttpServer): Server => {
     cors: { origin: "*" }, // production me apna frontend origin do
   });
 
-  //   io.use(socketAuth);
+  io.use(socketAuth);
 
   io.on("connection", (socket) => {
-    const userId = socket.data.userId as string;
+    const user = socket.data.user;
     console.log(`A new user is connected ${socket.id}`);
+
+    socket.on("location:update", async (data) => {
+      const { lat, lng } = data;
+      await publishLocation(user.id, lat, lng);
+    });
 
     socket.on("disconnect", () => {});
   });
