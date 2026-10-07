@@ -17,6 +17,13 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string(),
   CLOUDINARY_API_KEY: z.string(),
   CLOUDINARY_API_SECRET: z.string(),
+  KAFKA_BROKERS: z.string(),
+  KAFKA_USERNAME: z.string(),
+  KAFKA_PASSWORD: z.string(),
+  KAFKA_SASL_MECHANISM: z
+    .enum(["plain", "scram-sha-256", "scram-sha-512"])
+    .default("plain"),
+  KAFKA_LOCATION_TOPIC: z.string(),
 });
 
 const createEnv = (env: NodeJS.ProcessEnv) => {
