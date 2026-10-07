@@ -39,7 +39,8 @@
     "drizzle-kit": "1.0.0-rc.4",
     "openapi3-ts": "^4.6.1",
     "tsc-watch": "^7.2.1",
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^9.1.0",
