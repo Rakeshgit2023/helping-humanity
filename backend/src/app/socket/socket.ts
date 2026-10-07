@@ -7,7 +7,7 @@ let io: Server | null = null;
 
 export const initSocket = (httpServer: HttpServer): Server => {
   io = new Server(httpServer, {
-    cors: { origin: "*" }, // production me apna frontend origin do
+    cors: { origin: "*" }, // production me apna frontend origin
   });
 
   io.use(socketAuth);
