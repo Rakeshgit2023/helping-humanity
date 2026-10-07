@@ -10,7 +10,7 @@ import {
   connectLocationProducer,
   disconnectLocationProducer,
 } from "./app/comman/kafka/location.producer.js";
-import { initSocket } from "./app/socket.js";
+import { initSocket } from "./app/socket/socket.js";
 import { createKafkaTopics } from "./app/comman/kafka/kafka.admin.js";
 
 async function main() {
