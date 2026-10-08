@@ -22,7 +22,7 @@ export const initSocket = (httpServer: HttpServer): Server => {
       console.log(
         `Received location update from user ${user.firstName} ${user.lastName}: lat=${lat}, lng=${lng}`,
       );
-      // await publishLocation(user.id, lat, lng);
+      await publishLocation(user.id, lat, lng);
     });
 
     socket.on("disconnect", () => {});
