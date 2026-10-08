@@ -18,6 +18,10 @@ export const startLocationConsumer = async () => {
       try {
         const data: LocationMsg = JSON.parse(message.value.toString());
 
+        console.log(
+          `Received location message for user ${data.userId}: lat=${data.lat}, lng=${data.lng}, ts=${data.ts}`,
+        );
+
         await db
           .insert(userLocations)
           .values({
