@@ -76,11 +76,11 @@ export const userLocations = pgTable(
     lat: doublePrecision("lat").notNull(),
     lng: doublePrecision("lng").notNull(),
 
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   },
-  (t) => [index("user_locations_lat_lng_idx").on(t.lat, t.lng)],
+  (t) => [
+    uniqueIndex("user_locations_user_recorded_uq").on(t.userId, t.recordedAt),
+  ],
 );
 
 export const emailVerificationOtps = pgTable(
