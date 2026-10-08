@@ -68,9 +68,10 @@ export const users = pgTable(
 export const userLocations = pgTable(
   "user_locations",
   {
-    // primary key hi foreign key: isse one-to-one guarantee hota hai
+    id: uuid("id").primaryKey().defaultRandom(),
+
     userId: uuid("user_id")
-      .primaryKey()
+      .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
 
     lat: doublePrecision("lat").notNull(),

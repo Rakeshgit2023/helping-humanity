@@ -49,7 +49,9 @@ export const startLocationConsumer = async () => {
             lng: data.lng,
             recordedAt: new Date(data.ts),
           })
-          .onConflictDoNothing();
+          .onConflictDoNothing({
+            target: [userLocations.userId, userLocations.recordedAt],
+          });
       } catch (err) {
         console.error("Error processing message:", err);
       }
