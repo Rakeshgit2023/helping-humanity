@@ -74,6 +74,10 @@ export const userLocations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
 
+    requestId: uuid("request_id").references(() => requests.id, {
+      onDelete: "cascade",
+    }),
+
     lat: doublePrecision("lat").notNull(),
     lng: doublePrecision("lng").notNull(),
 
