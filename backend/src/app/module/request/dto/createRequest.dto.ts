@@ -68,47 +68,81 @@ const baseCreateRequestSchema = z.object({
     .max(10, "Broadcast radius must not exceed 10 km")
     .default(3),
 
+  totalVolunteersNeeded: z.coerce
+    .number()
+    .int("Total volunteers needed must be an integer")
+    .positive("Total volunteers needed must be greater than 0")
+    .max(10, "Total volunteers needed must not exceed 10")
+    .default(1),
+
   expiresAt: z.iso.datetime().optional(),
 });
-const createRequestSchema = baseCreateRequestSchema.superRefine((data, ctx) => {
-  const isBloodDonation = data.category.name === "blood donation";
+export const createRequestSchema = baseCreateRequestSchema.superRefine(
+  (data, ctx) => {
+    const isBloodDonation = data.category.name === "blood donation";
 
-  if (isBloodDonation) {
-    if (!data.bloodGroupNeeded) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["bloodGroupNeeded"],
-        message: "Blood group is required for blood donation requests",
-      });
-    }
+    if (isBloodDonation) {
+      if (!data.bloodGroupNeeded) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["bloodGroupNeeded"],
+          message: "Blood group is required for blood donation requests",
+        });
+      }
 
-    if (!data.hospitalName?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["hospitalName"],
-        message: "Hospital name is required for blood donation requests",
-      });
-    }
-  } else {
-    if (data.bloodGroupNeeded) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["bloodGroupNeeded"],
-        message: "Blood group is only allowed for blood donation requests",
-      });
-    }
+      if (!data.hospitalName?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["hospitalName"],
+          message: "Hospital name is required for blood donation requests",
+        });
+      }
+    } else {
+      if (data.bloodGroupNeeded) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["bloodGroupNeeded"],
+          message: "Blood group is only allowed for blood donation requests",
+        });
+      }
 
-    if (data.hospitalName?.trim()) {
-      ctx.addIssue({
-        code: "custom",
-        path: ["hospitalName"],
-        message: "Hospital name is only allowed for blood donation requests",
-      });
+      if (data.hospitalName?.trim()) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["hospitalName"],
+          message: "Hospital name is only allowed for blood donation requests",
+        });
+      }
     }
-  }
-});
+  },
+);
 
 export type CreateRequestInput = z.infer<typeof createRequestSchema>;
+
+export const createRequestResponseSchema = z.object({
+  message: z.string(),
+  data: z.object({
+    id: z.uuid(),
+    title: z.string(),
+    description: z.string().nullable(),
+    categoryId: z.uuid(),
+    lat: z.number(),
+    lng: z.number(),
+    address: z.string().nullable(),
+    bloodGroupNeeded: z.string().nullable(),
+    hospitalName: z.string().nullable(),
+    priority: z.string(),
+    status: z.string(),
+    broadcastRadiusKm: z.number(),
+    totalVolunteersNeeded: z.number(),
+    expiresAt: z.iso.datetime().nullable(),
+    createdAt: z.iso.datetime(),
+  }),
+});
+
+export type CreateRequestResponseInput = z.infer<
+  typeof createRequestResponseSchema
+>;
 
 class CreateRequestDto extends BaseDto<typeof createRequestSchema.shape> {
   constructor() {

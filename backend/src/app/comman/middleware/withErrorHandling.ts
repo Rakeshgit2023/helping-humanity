@@ -14,7 +14,7 @@ export function withErrorHandling<Args extends unknown[], Result>(
       console.error(`${label} Error:`, error);
       throw ApiError.internal(
         error?.cause?.detail ||
-          `Unable to complete "${label}". Please try again later.`,
+          `Unable to complete ${label} : ${error?.cause?.message || error?.message}. Please try again later.`,
       );
     }
   };

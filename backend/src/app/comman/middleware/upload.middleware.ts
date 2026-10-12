@@ -12,7 +12,7 @@ const mediaLabel: Record<MediaType, string> = {
 
 const storage = multer.memoryStorage();
 
-const allowedMimeTypes: Record<MediaType, string[]> = {
+export const allowedMimeTypes: Record<MediaType, string[]> = {
   image: ["image/jpeg", "image/png", "image/webp"],
 
   video: ["video/mp4", "video/mpeg", "video/quicktime", "video/webm"],

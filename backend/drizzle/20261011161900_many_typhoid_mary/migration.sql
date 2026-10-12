@@ -1,0 +1,1 @@
+ALTER TABLE "requests" ADD COLUMN "total_volunteers_needed" integer DEFAULT 1 NOT NULL;

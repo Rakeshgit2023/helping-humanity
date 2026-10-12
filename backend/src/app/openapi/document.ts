@@ -9,6 +9,7 @@ import { registry } from "./registry.js";
 // double-checking after adding a new one).
 import "./paths/auth.paths.js";
 import "./paths/category.paths.js";
+import "./paths/request.paths.js";
 
 export function generateOpenApiDocument(): OpenAPIObject {
   const generator = new OpenApiGeneratorV31(registry.definitions);

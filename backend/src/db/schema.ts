@@ -212,6 +212,10 @@ export const requests = pgTable(
       .notNull()
       .default(3),
 
+    totalVolunteersNeeded: integer("total_volunteers_needed")
+      .notNull()
+      .default(1),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
