@@ -1,9 +1,15 @@
 import z from "zod";
+import { extendZodWithOpenApi } from "@asteasolutions/zod-to-openapi";
 import BaseDto from "../../../comman/dto/base.dto.js";
 import {
   bloodGroupValues,
   priorityValues,
 } from "../../../comman/utils/constant.js";
+
+extendZodWithOpenApi(z);
+
+const emptyToUndefined = (v: unknown) =>
+  typeof v === "string" && v.trim() === "" ? undefined : v;
 
 const categorySchema = z.object(
   {
@@ -16,17 +22,23 @@ const categorySchema = z.object(
 );
 
 const baseCreateRequestSchema = z.object({
-  category: z.preprocess((value) => {
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
+  category: z
+    .preprocess((value) => {
+      if (typeof value === "string") {
+        try {
+          return JSON.parse(value);
+        } catch {
+          return value;
+        }
       }
-    }
-
-    return value;
-  }, categorySchema),
+      return value;
+    }, categorySchema)
+    .openapi({
+      type: "string",
+      description: "JSON string of the category object",
+      example:
+        '{"id":"60a6f88b-9b50-49a6-9307-a5861282d440","name":"animal rescue"}',
+    }),
 
   title: z
     .string({ error: "Title is required" })
@@ -48,17 +60,17 @@ const baseCreateRequestSchema = z.object({
     .min(-180, "Invalid longitude")
     .max(180, "Invalid longitude"),
 
-  address: z
-    .string()
-    .max(250, "Address must not exceed 1000 characters")
-    .optional(),
+address: z.preprocess(
+  emptyToUndefined,
+  z.string().max(250, "Address must not exceed 250 characters").optional(),
+),
 
-  bloodGroupNeeded: z.enum(bloodGroupValues).optional(),
+  bloodGroupNeeded: z.preprocess(emptyToUndefined, z.enum(bloodGroupValues).optional()),
 
-  hospitalName: z
-    .string()
-    .max(160, "Hospital name must not exceed 160 characters")
-    .optional(),
+hospitalName: z.preprocess(
+  emptyToUndefined,
+  z.string().max(160, "Hospital name must not exceed 160 characters").optional(),
+),
 
   priority: z.enum(priorityValues).default("normal"),
 
