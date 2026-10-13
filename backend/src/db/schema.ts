@@ -74,6 +74,10 @@ export const userLocations = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
 
+    requestId: uuid("request_id").references(() => requests.id, {
+      onDelete: "cascade",
+    }),
+
     lat: doublePrecision("lat").notNull(),
     lng: doublePrecision("lng").notNull(),
 
@@ -207,6 +211,10 @@ export const requests = pgTable(
     broadcastRadiusKm: doublePrecision("broadcast_radius_km")
       .notNull()
       .default(3),
+
+    totalVolunteersNeeded: integer("total_volunteers_needed")
+      .notNull()
+      .default(1),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
