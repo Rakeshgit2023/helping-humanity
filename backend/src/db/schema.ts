@@ -68,19 +68,24 @@ export const users = pgTable(
 export const userLocations = pgTable(
   "user_locations",
   {
-    // primary key hi foreign key: isse one-to-one guarantee hota hai
+    id: uuid("id").primaryKey().defaultRandom(),
+
     userId: uuid("user_id")
-      .primaryKey()
+      .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+
+    requestId: uuid("request_id").references(() => requests.id, {
+      onDelete: "cascade",
+    }),
 
     lat: doublePrecision("lat").notNull(),
     lng: doublePrecision("lng").notNull(),
 
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
   },
-  (t) => [index("user_locations_lat_lng_idx").on(t.lat, t.lng)],
+  (t) => [
+    uniqueIndex("user_locations_user_recorded_uq").on(t.userId, t.recordedAt),
+  ],
 );
 
 export const emailVerificationOtps = pgTable(
@@ -206,6 +211,10 @@ export const requests = pgTable(
     broadcastRadiusKm: doublePrecision("broadcast_radius_km")
       .notNull()
       .default(3),
+
+    totalVolunteersNeeded: integer("total_volunteers_needed")
+      .notNull()
+      .default(1),
 
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

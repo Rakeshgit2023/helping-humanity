@@ -15,9 +15,13 @@ export const initSocket = (httpServer: HttpServer): Server => {
   io.on("connection", (socket) => {
     const user = socket.data.user;
     console.log(`A new user is connected ${socket.id}`);
+    console.log(`Connected User ${user}`);
 
     socket.on("location:update", async (data) => {
       const { lat, lng } = data;
+      console.log(
+        `Received location update from user ${user.firstName} ${user.lastName}: lat=${lat}, lng=${lng}`,
+      );
       await publishLocation(user.id, lat, lng);
     });
 
