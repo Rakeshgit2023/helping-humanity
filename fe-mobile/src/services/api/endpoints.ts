@@ -11,6 +11,9 @@ export const ENDPOINTS = {
     list: '/category',
     search: '/category/search',
   },
+  request: {
+    create: '/request',
+  },
   user: {
     profile: '/users/me',
     updateProfile: '/users/me',
