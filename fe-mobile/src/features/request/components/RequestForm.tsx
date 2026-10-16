@@ -2,6 +2,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ArrowLeft, Camera, MapPin, Plus, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -13,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { useLocationStore } from '@/store/locationStore';
+import { getCurrentCoords } from '@/features/location/services/getCurrentCoords';
 import { brand } from '@/theme';
 
 import {
@@ -23,28 +24,59 @@ import {
   MAX_PHOTOS,
   PRIORITIES,
 } from '../constants/request.constants';
-import type { RequestDraft, RequestPriority } from '../types/request.types';
+import type { RequestDraft, RequestPhoto, RequestPriority } from '../types/request.types';
+
+const MAX_DESCRIPTION = 250; // server limit
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024; // server limit
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 interface RequestFormProps {
   categoryId: string;
+  /** The server's category (uuid + name). null while loading or if it doesn't exist. */
+  backendCategory: { id: string; name: string } | null;
+  categoriesLoading: boolean;
+  /** Prefill after a failed attempt so nothing the user typed is lost. */
+  initial?: RequestDraft;
   onBack: () => void;
   onSubmit: (draft: RequestDraft) => void;
 }
 
-export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) {
+export function RequestForm({
+  categoryId,
+  backendCategory,
+  categoriesLoading,
+  initial,
+  onBack,
+  onSubmit,
+}: RequestFormProps) {
   const cat = getCategory(categoryId);
   const defaults = CATEGORY_DEFAULTS[categoryId];
   const Icon = cat.icon;
-  const lastCoords = useLocationStore((s) => s.lastCoords);
 
   // photos is a fixed 2-slot array so slot 2 can be empty while slot 1 is filled.
-  const [photos, setPhotos] = useState<(string | null)[]>([null, null]);
-  const [priority, setPriority] = useState<RequestPriority>(defaults?.urgent ? 'Urgent' : 'Normal');
-  const [description, setDescription] = useState(defaults?.description ?? '');
-  const [bloodGroup, setBloodGroup] = useState<string | null>(null);
+  const [photos, setPhotos] = useState<(RequestPhoto | null)[]>([
+    initial?.photos[0] ?? null,
+    initial?.photos[1] ?? null,
+  ]);
+  const [priority, setPriority] = useState<RequestPriority>(
+    initial?.priority ?? (defaults?.urgent ? 'Urgent' : 'Normal'),
+  );
+  const [description, setDescription] = useState(
+    initial?.description ?? defaults?.description ?? '',
+  );
+  const [bloodGroup, setBloodGroup] = useState<string | null>(initial?.bloodGroup ?? null);
+  const [hospitalName, setHospitalName] = useState(initial?.hospitalName ?? '');
+  const [submitting, setSubmitting] = useState(false);
 
+  const isBlood = categoryId === 'blood';
   const photoCount = photos.filter(Boolean).length;
-  const canSend = description.trim().length > 0 && (categoryId !== 'blood' || !!bloodGroup);
+  // The server needs at least 1 photo, a category, and (blood only) group + hospital.
+  const canSend =
+    !submitting &&
+    !!backendCategory &&
+    photoCount >= 1 &&
+    description.trim().length > 0 &&
+    (!isBlood || (!!bloodGroup && hospitalName.trim().length > 0));
 
   const pickPhoto = async (slot: number) => {
     if (slot === 1 && !photos[0]) return; // 2nd slot unlocks after the 1st
@@ -53,12 +85,25 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
       quality: 0.7,
     });
     if (result.canceled) return;
-    const uri = result.assets[0]?.uri;
-    if (!uri) {
+    const asset = result.assets[0];
+    if (!asset?.uri) {
       Alert.alert('Could not add photo', 'Please try another image.');
       return;
     }
-    setPhotos((cur) => cur.map((p, i) => (i === slot ? uri : p)));
+    if (asset.fileSize && asset.fileSize > MAX_PHOTO_BYTES) {
+      Alert.alert('Photo too large', 'Each photo must be under 5 MB.');
+      return;
+    }
+    // quality < 1 re-encodes the picture, so anything unexpected (e.g. HEIC) is now a JPEG.
+    const type =
+      asset.mimeType && ALLOWED_TYPES.includes(asset.mimeType) ? asset.mimeType : 'image/jpeg';
+    const ext = type.split('/')[1];
+    const photo: RequestPhoto = {
+      uri: asset.uri,
+      type,
+      name: `request-photo-${slot + 1}.${ext}`,
+    };
+    setPhotos((cur) => cur.map((p, i) => (i === slot ? photo : p)));
   };
 
   const removePhoto = (slot: number) =>
@@ -68,15 +113,31 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
       return next[0] ? next : [next[1], null];
     });
 
-  const submit = () =>
+  const submit = async () => {
+    if (!backendCategory) return;
+    setSubmitting(true);
+    const coords = await getCurrentCoords();
+    setSubmitting(false);
+    if (!coords) {
+      Alert.alert(
+        'Location needed',
+        'We need your location so nearby volunteers can find you. Please allow location access and try again.',
+      );
+      return;
+    }
+    const text = description.trim();
     onSubmit({
       categoryId,
-      description: description.trim(),
+      category: backendCategory,
+      title: `${cat.label}: ${text}`.slice(0, 160), // server needs a title (5–160 chars)
+      description: text,
       priority,
-      bloodGroup,
-      photos: photos.filter((p): p is string => !!p),
-      coords: lastCoords,
+      bloodGroup: isBlood ? bloodGroup : null,
+      hospitalName: isBlood ? hospitalName.trim() : null,
+      photos: photos.filter((p): p is RequestPhoto => !!p),
+      coords,
     });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -103,7 +164,9 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
       >
         <View>
           <View className="mb-2 flex-row items-center justify-between">
-            <Text className="text-sm font-bold text-ink">Photo</Text>
+            <Text className="text-sm font-bold text-ink">
+              Photo <Text className="text-clay">*</Text>
+            </Text>
             <Text className="text-xs text-ink-soft">
               {photoCount}/{MAX_PHOTOS} added
             </Text>
@@ -128,7 +191,10 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
                 >
                   {photo ? (
                     <>
-                      <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} />
+                      <Image
+                        source={{ uri: photo.uri }}
+                        style={{ width: '100%', height: '100%' }}
+                      />
                       <Pressable
                         onPress={() => removePhoto(slot)}
                         hitSlop={8}
@@ -213,12 +279,27 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
           </View>
         )}
 
+        {isBlood && (
+          <View>
+            <Text className="mb-2 text-sm font-bold text-ink">Hospital name</Text>
+            <TextInput
+              value={hospitalName}
+              onChangeText={setHospitalName}
+              maxLength={160}
+              placeholder="e.g. City Hospital, NICU"
+              placeholderTextColor={brand.inkSoft}
+              className="rounded-xl border border-line bg-white p-3 text-sm text-ink"
+            />
+          </View>
+        )}
+
         <View>
           <Text className="mb-2 text-sm font-bold text-ink">Description</Text>
           <TextInput
             value={description}
             onChangeText={setDescription}
             multiline
+            maxLength={MAX_DESCRIPTION}
             numberOfLines={3}
             textAlignVertical="top"
             placeholder="What's the situation?"
@@ -228,13 +309,20 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
         </View>
 
         <View className="flex-row items-center gap-2 rounded-xl border border-line bg-white p-3">
-          <MapPin size={15} color={lastCoords ? brand.leaf : brand.inkSoft} />
-          <Text className="text-sm text-ink-soft">
-            {lastCoords
-              ? 'Location auto-captured'
-              : 'Location not available yet — volunteers will see your last known area'}
-          </Text>
+          <MapPin size={15} color={brand.leaf} />
+          <Text className="text-sm text-ink-soft">Your location is captured when you send</Text>
         </View>
+
+        {!backendCategory && !categoriesLoading && (
+          <Text className="text-sm text-clay">
+            This category isn&apos;t available right now. Please try again later.
+          </Text>
+        )}
+        {photoCount === 0 && (
+          <Text className="text-xs text-ink-soft">
+            Add at least one photo so volunteers know what to expect.
+          </Text>
+        )}
       </ScrollView>
 
       <View className="border-t border-line p-3">
@@ -244,7 +332,11 @@ export function RequestForm({ categoryId, onBack, onSubmit }: RequestFormProps) 
           className="items-center rounded-xl py-3.5 active:opacity-80"
           style={{ backgroundColor: cat.accent, opacity: canSend ? 1 : 0.4 }}
         >
-          <Text className="text-base font-bold text-white">Send Request</Text>
+          {submitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="text-base font-bold text-white">Send Request</Text>
+          )}
         </Pressable>
       </View>
     </KeyboardAvoidingView>

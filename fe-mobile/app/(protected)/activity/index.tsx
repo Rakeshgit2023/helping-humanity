@@ -53,7 +53,7 @@ export default function ActivityScreen() {
           >
             {request.photos[0] ? (
               <Image
-                source={{ uri: request.photos[0] }}
+                source={{ uri: request.photos[0].uri }}
                 style={{ width: '100%', height: '100%' }}
               />
             ) : (

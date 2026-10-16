@@ -137,7 +137,7 @@ export function SearchingStage({ request, onMinimize, onCancel }: SearchingStage
         >
           <Text className="text-lg">{emoji}</Text>
           <Text className="flex-1 text-xs text-ink">
-            <Text className="font-bold">#{request.id}</Text> · {cat.label} ·{' '}
+            <Text className="font-bold">#{request.shortId}</Text> · {cat.label} ·{' '}
             <Text className="text-ink-soft">{request.description}</Text>
           </Text>
         </View>

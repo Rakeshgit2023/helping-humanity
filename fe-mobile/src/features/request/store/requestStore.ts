@@ -1,14 +1,18 @@
 import { create } from 'zustand';
 
+import { toAppError } from '@/utils/errorHandler';
+
 import { requestService } from '../services/request.service';
 import type { FlowStage, HelpRequest, RequestDraft } from '../types/request.types';
 
 interface RequestState {
   request: HelpRequest | null;
-  /** What the user just submitted; lets the flow render before the server replies. */
+  /** What the user submitted. Kept after a failure so they can retry or edit. */
   draft: RequestDraft | null;
+  error: string | null;
   stage: FlowStage | null;
   raise: (draft: RequestDraft) => Promise<void>;
+  retry: () => Promise<void>;
   setStage: (stage: FlowStage | null) => void;
   startSearch: () => void;
   cancel: () => void;
@@ -17,17 +21,23 @@ interface RequestState {
 export const useRequestStore = create<RequestState>((set, get) => ({
   request: null,
   draft: null,
+  error: null,
   stage: null,
 
   raise: async (draft) => {
-    set({ draft, stage: 'raising' });
+    set({ draft, error: null, request: null, stage: 'raising' });
     try {
       const request = await requestService.createRequest(draft);
-      set({ request });
+      set({ request, draft: null });
     } catch (error) {
-      set({ draft: null, stage: null });
-      throw error;
+      // Keep the draft so "Try again" / "Edit request" don't lose what was typed.
+      set({ error: toAppError(error).message, stage: null });
     }
+  },
+
+  retry: async () => {
+    const { draft } = get();
+    if (draft) await get().raise(draft);
   },
 
   setStage: (stage) => set({ stage }),
@@ -41,5 +51,6 @@ export const useRequestStore = create<RequestState>((set, get) => ({
     });
   },
 
-  cancel: () => set({ request: null, draft: null, stage: null }),
+  // TODO: call the cancel endpoint once the backend has one.
+  cancel: () => set({ request: null, draft: null, error: null, stage: null }),
 }));

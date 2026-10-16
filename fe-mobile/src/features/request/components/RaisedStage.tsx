@@ -70,7 +70,7 @@ export function RaisedStage({ request, onFind }: { request: HelpRequest; onFind:
           <Text className="text-xs font-bold tracking-wide" style={{ color: cat.accent }}>
             REQUEST ID
           </Text>
-          <Text className="text-sm font-extrabold text-ink">#{request.id}</Text>
+          <Text className="text-sm font-extrabold text-ink">#{request.shortId}</Text>
         </View>
         <View className="flex-row gap-3 p-4">
           <View
@@ -79,7 +79,7 @@ export function RaisedStage({ request, onFind }: { request: HelpRequest; onFind:
           >
             {request.photos[0] ? (
               <Image
-                source={{ uri: request.photos[0] }}
+                source={{ uri: request.photos[0].uri }}
                 style={{ width: '100%', height: '100%' }}
               />
             ) : (
