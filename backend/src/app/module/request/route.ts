@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   requireFiles,
   upload,
+  normalizeMultipart,
 } from "../../comman/middleware/upload.middleware.js";
 import * as controller from "./controller.js";
 import { catchAsyncErrors } from "../../comman/middleware/catchAsyncError.js";
@@ -19,7 +20,8 @@ router.post(
   "/",
   isAuthenticated,
   authorize("user", "volunteer"),
-  upload("image", 2).array("files"),
+  upload("image", 2, true).any(),
+  normalizeMultipart,
   validate(createRequestDto, "body", true),
   catchAsyncErrors(controller.createRequest),
 );

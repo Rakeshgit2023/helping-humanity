@@ -31,16 +31,23 @@ export const allowedMimeTypes: Record<MediaType, string[]> = {
 export const upload = (
   mediaType: MediaType = "image",
   maxFiles: number = 2,
+  allowJsonFields: boolean = false,
 ) => {
   return multer({
     storage,
-
     limits: {
-      fileSize: 5 * 1024 * 1024, // 5 MB per file
-      files: maxFiles,
+      fileSize: 5 * 1024 * 1024,
+      files: allowJsonFields ? maxFiles + 1 : maxFiles,
     },
-
     fileFilter: (_req, file, cb) => {
+      if (
+        allowJsonFields &&
+        file.fieldname !== "files" &&
+        file.mimetype === "application/json"
+      ) {
+        return cb(null, true);
+      }
+
       if (allowedMimeTypes[mediaType].includes(file.mimetype)) {
         cb(null, true);
       } else {
@@ -48,6 +55,29 @@ export const upload = (
       }
     },
   });
+};
+
+export const normalizeMultipart = (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  const all = (req.files as Express.Multer.File[] | undefined) ?? [];
+
+  for (const f of all) {
+    if (f.fieldname !== "files" && f.mimetype === "application/json") {
+      req.body[f.fieldname] = f.buffer.toString("utf8");
+    }
+  }
+
+  const photos = all.filter((f) => f.fieldname === "files");
+
+  if (photos.length > 2) {
+    return res.status(400).json({ message: "You can upload at most 2 images" });
+  }
+
+  req.files = photos;
+  next();
 };
 
 export const requireFiles = (
