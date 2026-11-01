@@ -39,7 +39,8 @@ router.post(
   "/:requestId/accept",
   isAuthenticated,
   authorize("volunteer"),
-  validate(acceptRequestDto, "params"),
+  validate(requestIdParamDto, "params"),
+  validate(acceptRequestDto, "body"),
   catchAsyncErrors(controller.acceptRequest),
 );
 

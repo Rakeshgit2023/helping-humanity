@@ -22,8 +22,12 @@ export const volunteersForRequest = async (req: Request, res: Response) => {
 };
 
 export const acceptRequest = async (req: Request, res: Response) => {
-  const params = req.validatedParams as AcceptRequestBodyInput;
-  const result = await requestService.acceptRequest(params, req.user);
+  const params = req.validatedParams as RequestIdParamInput;
+  const body = req.body as Omit<AcceptRequestBodyInput, "requestId">;
+  const result = await requestService.acceptRequest(
+    { ...params, ...body },
+    req.user,
+  );
   return ApiResponse.ok(res, "Request accepted successfully", result);
 };
 
