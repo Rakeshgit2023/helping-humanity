@@ -948,6 +948,8 @@ import { db } from "../../../db/index.js";
 import {
   requestAssignments,
   requestBroadcasts,
+  chatMessages,
+  chatParticipants,
   requestPhotos,
   requests,
   userLocations,
@@ -967,6 +969,7 @@ import { sql } from "drizzle-orm/sql/sql";
 import { count } from "drizzle-orm/sql/functions/aggregate";
 import type { RequestIdParamInput } from "./dto/requestIdParam.dto.js";
 import type { AcceptRequestBodyInput } from "./dto/acceptRequest.dto.js";
+import { closeRequestChat, joinUserToRequestChat } from "../../socket/chat-room.js";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -1113,7 +1116,7 @@ const reopenRequest = async (
         ),
       );
 
-    return { notified: [] as string[] };
+    return { notified: [] as string[], expired: true };
   }
 
   await tx
@@ -1121,7 +1124,7 @@ const reopenRequest = async (
     .set({ status: "broadcasted" })
     .where(eq(requests.id, request.id));
 
-  return broadcastToNearby(tx, request);
+  return { ...(await broadcastToNearby(tx, request)), expired: false };
 };
 
 const countTakenSlots = async (tx: Tx, requestId: string): Promise<number> => {
@@ -1137,6 +1140,196 @@ const countTakenSlots = async (tx: Tx, requestId: string): Promise<number> => {
 
   return row?.taken ?? 0;
 };
+
+const ensureActiveChatParticipant = async (
+  tx: Tx,
+  requestId: string,
+  requesterId: string,
+  userId: string,
+) => {
+  if (requesterId !== userId) {
+    const [assignment] = await tx
+      .select({ volunteerId: requestAssignments.volunteerId })
+      .from(requestAssignments)
+      .where(
+        and(
+          eq(requestAssignments.requestId, requestId),
+          eq(requestAssignments.volunteerId, userId),
+          isNull(requestAssignments.cancelledAt),
+        ),
+      )
+      .limit(1);
+
+    if (!assignment) {
+      throw ApiError.forbidden("Only the requester and accepted volunteers can join this chat");
+    }
+  }
+
+  await tx
+    .insert(chatParticipants)
+    .values({ requestId, userId })
+    .onConflictDoNothing();
+
+  const [participant] = await tx
+    .select({ leftAt: chatParticipants.leftAt })
+    .from(chatParticipants)
+    .where(
+      and(
+        eq(chatParticipants.requestId, requestId),
+        eq(chatParticipants.userId, userId),
+      ),
+    )
+    .limit(1);
+
+  if (!participant || participant.leftAt) {
+    throw ApiError.forbidden("You have left this chat and cannot rejoin");
+  }
+};
+
+export const chatRoomsForUser = withErrorHandling(
+  "Get active chat rooms for user",
+  async (userId: string) => {
+    const participants = await db
+      .select({ requestId: chatParticipants.requestId })
+      .from(chatParticipants)
+      .innerJoin(requests, eq(requests.id, chatParticipants.requestId))
+      .where(
+        and(
+          eq(chatParticipants.userId, userId),
+          isNull(chatParticipants.leftAt),
+          notInArray(requests.status, ["completed", "cancelled", "expired"]),
+        ),
+      );
+
+    return participants.map((participant) => participant.requestId);
+  },
+);
+
+export const joinChatRoom = withErrorHandling(
+  "Join request chat",
+  async ({ requestId }: RequestIdParamInput, user: User) => {
+    await db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({ requesterId: requests.requesterId, status: requests.status })
+        .from(requests)
+        .where(eq(requests.id, requestId))
+        .limit(1);
+
+      if (!request) throw ApiError.notFound("Request not found");
+      if (["completed", "cancelled", "expired"].includes(request.status)) {
+        throw ApiError.badRequest("This request chat is closed");
+      }
+
+      await ensureActiveChatParticipant(tx, requestId, request.requesterId, user.id);
+    });
+
+    return { requestId };
+  },
+);
+
+export const leaveChatRoom = withErrorHandling(
+  "Leave request chat",
+  async ({ requestId }: RequestIdParamInput, user: User) => {
+    return db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({ requesterId: requests.requesterId })
+        .from(requests)
+        .where(eq(requests.id, requestId))
+        .limit(1);
+
+      if (!request) throw ApiError.notFound("Request not found");
+      if (request.requesterId === user.id) {
+        return { requestId, permanent: false };
+      }
+
+      const [participant] = await tx
+        .select({ leftAt: chatParticipants.leftAt })
+        .from(chatParticipants)
+        .where(
+          and(
+            eq(chatParticipants.requestId, requestId),
+            eq(chatParticipants.userId, user.id),
+          ),
+        )
+        .limit(1);
+
+      if (!participant || participant.leftAt) {
+        throw ApiError.forbidden("You are not an active participant in this chat");
+      }
+
+      const [assignment] = await tx
+        .select({ volunteerId: requestAssignments.volunteerId })
+        .from(requestAssignments)
+        .where(
+          and(
+            eq(requestAssignments.requestId, requestId),
+            eq(requestAssignments.volunteerId, user.id),
+            isNull(requestAssignments.cancelledAt),
+          ),
+        )
+        .limit(1);
+
+      if (!assignment) {
+        throw ApiError.forbidden("Only accepted volunteers can leave this chat");
+      }
+
+      await tx
+        .update(chatParticipants)
+        .set({ leftAt: new Date() })
+        .where(
+          and(
+            eq(chatParticipants.requestId, requestId),
+            eq(chatParticipants.userId, user.id),
+            isNull(chatParticipants.leftAt),
+          ),
+        );
+
+      return { requestId, permanent: true };
+    });
+  },
+);
+
+export const sendChatMessage = withErrorHandling(
+  "Send request chat message",
+  async (
+    { requestId }: RequestIdParamInput,
+    user: User,
+    body: unknown,
+  ) => {
+    if (typeof body !== "string" || !body.trim() || body.trim().length > 4000) {
+      throw ApiError.badRequest("Message must contain 1 to 4000 characters");
+    }
+
+    return db.transaction(async (tx) => {
+      const [request] = await tx
+        .select({ requesterId: requests.requesterId, status: requests.status })
+        .from(requests)
+        .where(eq(requests.id, requestId))
+        .limit(1);
+
+      if (!request) throw ApiError.notFound("Request not found");
+      if (["completed", "cancelled", "expired"].includes(request.status)) {
+        throw ApiError.badRequest("This request chat is closed");
+      }
+
+      await ensureActiveChatParticipant(tx, requestId, request.requesterId, user.id);
+
+      const [message] = await tx
+        .insert(chatMessages)
+        .values({ requestId, senderId: user.id, body: body.trim() })
+        .returning({
+          id: chatMessages.id,
+          requestId: chatMessages.requestId,
+          senderId: chatMessages.senderId,
+          body: chatMessages.body,
+          createdAt: chatMessages.createdAt,
+        });
+
+      if (!message) throw ApiError.internal("Failed to save chat message");
+      return message;
+    });
+  },
+);
 
 // ============================================================
 // APIs
@@ -1164,62 +1357,72 @@ export const createRequest = withErrorHandling(
   ) => {
     const uploadedFiles = await uploadFilesToCloudinary(files);
 
-    try {
-      return await db.transaction(async (tx) => {
-        const [newRequest] = await tx
-          .insert(requests)
-          .values({
-            requesterId: id,
-            categoryId: category.id,
-            title,
-            description: description ?? null,
-            lat,
-            lng,
-            ...(address && { address }),
-            ...(bloodGroupNeeded && { bloodGroupNeeded }),
-            ...(hospitalName && { hospitalName }),
-            priority,
-            broadcastRadiusKm,
-            totalVolunteersNeeded,
-            ...(expiresAt && { expiresAt: new Date(expiresAt) }),
-          })
-          .returning({
-            id: requests.id,
-            title: requests.title,
-            description: requests.description,
-            categoryId: requests.categoryId,
-            lat: requests.lat,
-            lng: requests.lng,
-            address: requests.address,
-            bloodGroupNeeded: requests.bloodGroupNeeded,
-            hospitalName: requests.hospitalName,
-            priority: requests.priority,
-            status: requests.status,
-            broadcastRadiusKm: requests.broadcastRadiusKm,
-            totalVolunteersNeeded: requests.totalVolunteersNeeded,
-            expiresAt: requests.expiresAt,
-            createdAt: requests.createdAt,
+    const newRequest = await (async () => {
+      try {
+        return await db.transaction(async (tx) => {
+          const [newRequest] = await tx
+            .insert(requests)
+            .values({
+              requesterId: id,
+              categoryId: category.id,
+              title,
+              description: description ?? null,
+              lat,
+              lng,
+              ...(address && { address }),
+              ...(bloodGroupNeeded && { bloodGroupNeeded }),
+              ...(hospitalName && { hospitalName }),
+              priority,
+              broadcastRadiusKm,
+              totalVolunteersNeeded,
+              ...(expiresAt && { expiresAt: new Date(expiresAt) }),
+            })
+            .returning({
+              id: requests.id,
+              title: requests.title,
+              description: requests.description,
+              categoryId: requests.categoryId,
+              lat: requests.lat,
+              lng: requests.lng,
+              address: requests.address,
+              bloodGroupNeeded: requests.bloodGroupNeeded,
+              hospitalName: requests.hospitalName,
+              priority: requests.priority,
+              status: requests.status,
+              broadcastRadiusKm: requests.broadcastRadiusKm,
+              totalVolunteersNeeded: requests.totalVolunteersNeeded,
+              expiresAt: requests.expiresAt,
+              createdAt: requests.createdAt,
+            });
+
+          if (!newRequest) {
+            throw ApiError.internal("Failed to create request");
+          }
+
+          await tx.insert(chatParticipants).values({
+            requestId: newRequest.id,
+            userId: id,
           });
 
-        if (!newRequest) {
-          throw ApiError.internal("Failed to create request");
-        }
+          if (uploadedFiles.length > 0) {
+            await tx.insert(requestPhotos).values(
+              uploadedFiles.map((file) => ({
+                requestId: newRequest.id,
+                photoUrl: file.url,
+              })),
+            );
+          }
 
-        if (uploadedFiles.length > 0) {
-          await tx.insert(requestPhotos).values(
-            uploadedFiles.map((file) => ({
-              requestId: newRequest.id,
-              photoUrl: file.url,
-            })),
-          );
-        }
+          return newRequest;
+        });
+      } catch (error) {
+        await deleteFilesFromCloudinary(uploadedFiles);
+        throw error;
+      }
+    })();
 
-        return newRequest;
-      });
-    } catch (error) {
-      await deleteFilesFromCloudinary(uploadedFiles);
-      throw error;
-    }
+    await joinUserToRequestChat(id, newRequest.id);
+    return newRequest;
   },
 );
 
@@ -1358,7 +1561,7 @@ export const volunteersForRequest = withErrorHandling(
 export const acceptRequest = withErrorHandling(
   "Accept request",
   async ({ requestId, lat, lng }: AcceptRequestBodyInput, user: User) => {
-    return db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // 1. Request row lock: is request par accept/decline ek-ek karke chalenge
       const [request] = await tx
         .select({
@@ -1497,6 +1700,11 @@ export const acceptRequest = withErrorHandling(
         throw e;
       }
 
+      await tx.insert(chatParticipants).values({
+        requestId,
+        userId: user.id,
+      });
+
       await tx
         .update(requestBroadcasts)
         .set({ status: "accepted", respondedAt: new Date() })
@@ -1535,6 +1743,9 @@ export const acceptRequest = withErrorHandling(
         isFull,
       };
     });
+
+    await joinUserToRequestChat(user.id, requestId);
+    return result;
   },
 );
 
@@ -1679,7 +1890,8 @@ export const startRequest = withErrorHandling(
 export const declineRequest = withErrorHandling(
   "Decline request",
   async ({ requestId }: RequestIdParamInput, user: User) => {
-    return db.transaction(async (tx) => {
+    let closeChat = false;
+    const result = await db.transaction(async (tx) => {
       // 1. Lock
       const [request] = await tx
         .select({
@@ -1770,6 +1982,17 @@ export const declineRequest = withErrorHandling(
         );
 
       await tx
+        .update(chatParticipants)
+        .set({ leftAt: now })
+        .where(
+          and(
+            eq(chatParticipants.requestId, requestId),
+            eq(chatParticipants.userId, user.id),
+            isNull(chatParticipants.leftAt),
+          ),
+        );
+
+      await tx
         .update(requestBroadcasts)
         .set({ status: "declined", respondedAt: now })
         .where(
@@ -1814,6 +2037,7 @@ export const declineRequest = withErrorHandling(
             .update(requests)
             .set({ status: "completed" })
             .where(eq(requests.id, requestId));
+          closeChat = true;
 
           // pending broadcasts expire
           await tx
@@ -1831,6 +2055,7 @@ export const declineRequest = withErrorHandling(
           const result = await reopenRequest(tx, request);
           notified = result.notified;
           reopened = true;
+          closeChat = result.expired;
         }
       } else if (
         request.status === "accepted" &&
@@ -1840,6 +2065,7 @@ export const declineRequest = withErrorHandling(
         const result = await reopenRequest(tx, request);
         notified = result.notified;
         reopened = true;
+        closeChat = result.expired;
       }
 
       return {
@@ -1850,13 +2076,16 @@ export const declineRequest = withErrorHandling(
         notified,
       };
     });
+
+    if (closeChat) await closeRequestChat(requestId);
+    return result;
   },
 );
 
 export const completeRequest = withErrorHandling(
   "Complete request",
   async ({ requestId }: RequestIdParamInput, user: User) => {
-    return db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       // 1. Lock
       const [request] = await tx
         .select({
@@ -1971,13 +2200,16 @@ export const completeRequest = withErrorHandling(
         expiredVolunteerIds: expired.map((r) => r.volunteerId),
       };
     });
+
+    if (result.requestCompleted) await closeRequestChat(requestId);
+    return result;
   },
 );
 
 export const cancelRequest = withErrorHandling(
   "Cancel request",
   async ({ requestId }: RequestIdParamInput, user: User) => {
-    return db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const [request] = await tx
         .select({
           id: requests.id,
@@ -2037,6 +2269,9 @@ export const cancelRequest = withErrorHandling(
         expiredVolunteerIds: expired.map((r) => r.volunteerId),
       };
     });
+
+    await closeRequestChat(requestId);
+    return result;
   },
 );
 
@@ -2045,7 +2280,7 @@ export const cancelRequest = withErrorHandling(
 export const expireOverdueRequests = withErrorHandling(
   "Expire overdue requests",
   async () => {
-    return db.transaction(async (tx) => {
+    const result = await db.transaction(async (tx) => {
       const now = new Date();
 
       const overdue = await tx
@@ -2088,5 +2323,10 @@ export const expireOverdueRequests = withErrorHandling(
 
       return { expiredRequestIds: ids };
     });
+
+    for (const requestId of result.expiredRequestIds) {
+      await closeRequestChat(requestId);
+    }
+    return result;
   },
 );

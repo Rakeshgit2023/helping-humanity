@@ -14,6 +14,8 @@ import { validate } from "../../comman/middleware/validate.middleware.js";
 import createRequestDto from "./dto/createRequest.dto.js";
 import requestIdParamDto from "./dto/requestIdParam.dto.js";
 import acceptRequestDto from "./dto/acceptRequest.dto.js";
+import * as chatHistoryController from "../chat-history/controller.js";
+import chatHistoryQueryDto from "../chat-history/dto/chatHistory.dto.js";
 
 const router: Router = Router();
 
@@ -82,6 +84,15 @@ router.post(
   authorize("user", "volunteer"),
   validate(requestIdParamDto, "params"),
   catchAsyncErrors(controller.cancelRequest),
+);
+
+router.get(
+  "/:requestId/chat/history",
+  isAuthenticated,
+  authorize("user", "volunteer"),
+  validate(requestIdParamDto, "params"),
+  validate(chatHistoryQueryDto, "query"),
+  catchAsyncErrors(chatHistoryController.getChatHistory),
 );
 
 export default router;

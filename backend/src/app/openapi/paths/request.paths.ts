@@ -7,6 +7,7 @@ import {
 } from "../../module/request/dto/createRequest.dto.js";
 import { acceptRequestBodySchema } from "../../module/request/dto/acceptRequest.dto.js";
 import { requestIdParamSchema } from "../../module/request/dto/requestIdParam.dto.js";
+import { chatHistoryQuerySchema } from "../../module/chat-history/dto/chatHistory.dto.js";
 import { registry } from "../registry.js";
 
 const requestIdParamsSchema = requestIdParamSchema.extend({
@@ -104,6 +105,25 @@ const cancelRequestResponseSchema = requestActionResponseSchema(
     status: z.literal("cancelled"),
     releasedVolunteerIds: z.array(z.uuid()),
     expiredVolunteerIds: z.array(z.uuid()),
+  }),
+);
+
+const chatHistoryResponseSchema = requestActionResponseSchema(
+  z.object({
+    requestId: z.uuid(),
+    messages: z.array(
+      z.object({
+        id: z.uuid(),
+        requestId: z.uuid(),
+        senderId: z.uuid().nullable(),
+        senderFirstName: z.string().nullable(),
+        senderLastName: z.string().nullable(),
+        body: z.string(),
+        createdAt: z.iso.datetime(),
+      }),
+    ),
+    hasMore: z.boolean(),
+    nextBefore: z.iso.datetime().nullable(),
   }),
 );
 
@@ -391,6 +411,37 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: cancelRequestResponseSchema,
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/request/{requestId}/chat/history",
+  tags: ["Request"],
+  summary: "Fetch request chat history",
+  description:
+    "Returns chat messages in chronological order for the requester and accepted volunteers. " +
+    "Use `nextBefore` as the `before` query parameter to fetch older messages. " +
+    "Live chat uses Socket.IO authenticated with the existing `auth.token`; the room id is the request UUID. " +
+    "Events: `chat:join` and `chat:leave` accept `{ requestId }`; `chat:message` accepts " +
+    "`{ requestId, body }` (1-4000 characters). The requester is enrolled on request creation and " +
+    "each volunteer is enrolled and joined on acceptance. A volunteer's `chat:leave` is permanent; " +
+    "completed, cancelled, and expired requests close the room.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: requestIdParamsSchema,
+    query: chatHistoryQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "Chat history fetched successfully",
+      content: {
+        "application/json": {
+          schema: chatHistoryResponseSchema,
         },
       },
     },
