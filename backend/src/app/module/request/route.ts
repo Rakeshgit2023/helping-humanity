@@ -16,6 +16,7 @@ import requestIdParamDto from "./dto/requestIdParam.dto.js";
 import acceptRequestDto from "./dto/acceptRequest.dto.js";
 import * as chatHistoryController from "../chat-history/controller.js";
 import chatHistoryQueryDto from "../chat-history/dto/chatHistory.dto.js";
+import sendChatMessageDto from "../chat-history/dto/sendChatMessage.dto.js";
 
 const router: Router = Router();
 
@@ -93,6 +94,15 @@ router.get(
   validate(requestIdParamDto, "params"),
   validate(chatHistoryQueryDto, "query"),
   catchAsyncErrors(chatHistoryController.getChatHistory),
+);
+
+router.post(
+  "/:requestId/chat/messages",
+  isAuthenticated,
+  authorize("user", "volunteer"),
+  validate(requestIdParamDto, "params"),
+  validate(sendChatMessageDto, "body"),
+  catchAsyncErrors(chatHistoryController.sendChatMessage),
 );
 
 export default router;

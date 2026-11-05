@@ -3,7 +3,7 @@ import { Server, type Socket } from "socket.io";
 import { socketAuth } from "../comman/middleware/socket.auth.middleware.js";
 import { publishLocation } from "../comman/kafka/location.producer.js";
 import ApiError from "../comman/utils/api.error.js";
-import * as requestService from "../module/request/service.js";
+import * as chatService from "../module/chat-history/service.js";
 import {
   removeUserFromRequestChat,
   setChatSocketServer,
@@ -60,20 +60,31 @@ export const initSocket = (httpServer: HttpServer): Server => {
 
   io.on("connection", (socket) => {
     const user = socket.data.user;
-    console.log(`A new user is connected ${socket.id}`);
-    console.log(`Connected User ${user}`);
+    console.log(
+      `[Socket] 🟢 Connected: ${user?.firstName} ${user?.lastName || ""} (ID: ${user?.id}, Role: ${user?.role}, Socket: ${socket.id})`,
+    );
 
     socket.on("chat:join", async (payload: unknown, ack?: ChatAck) => {
       try {
         const requestId = getRequestId(payload);
-        await requestService.joinChatRoom({ requestId }, user);
+        console.log(
+          `[Chat Socket] 📥 'chat:join' received from ${user?.firstName} (${user?.id}) for Room: ${requestId}`,
+        );
+        await chatService.joinChatRoom({ requestId }, user);
         await socket.join(requestId);
         socket.to(requestId).emit("chat:participant_joined", {
           requestId,
           userId: user.id,
         });
+        console.log(
+          `[Chat Socket] ✅ User ${user?.firstName} (${user?.id}) joined Room: ${requestId}`,
+        );
         respondToChatEvent(socket, ack, undefined, { requestId });
       } catch (error) {
+        console.error(
+          `[Chat Socket] ❌ 'chat:join' rejected for ${user?.firstName}:`,
+          error instanceof Error ? error.message : error,
+        );
         respondToChatEvent(socket, ack, error);
       }
     });
@@ -81,14 +92,24 @@ export const initSocket = (httpServer: HttpServer): Server => {
     socket.on("chat:leave", async (payload: unknown, ack?: ChatAck) => {
       try {
         const requestId = getRequestId(payload);
-        const result = await requestService.leaveChatRoom({ requestId }, user);
+        console.log(
+          `[Chat Socket] 🚪 'chat:leave' received from ${user?.firstName} (${user?.id}) for Room: ${requestId}`,
+        );
+        const result = await chatService.leaveChatRoom({ requestId }, user);
         if (result.permanent) {
           await removeUserFromRequestChat(user.id, requestId);
         } else {
           await socket.leave(requestId);
         }
+        console.log(
+          `[Chat Socket] ✅ User ${user?.firstName} (${user?.id}) left Room: ${requestId} (Permanent: ${result.permanent})`,
+        );
         respondToChatEvent(socket, ack, undefined, result);
       } catch (error) {
+        console.error(
+          `[Chat Socket] ❌ 'chat:leave' failed for ${user?.firstName}:`,
+          error instanceof Error ? error.message : error,
+        );
         respondToChatEvent(socket, ack, error);
       }
     });
@@ -105,14 +126,20 @@ export const initSocket = (httpServer: HttpServer): Server => {
             payload && typeof payload === "object" && "body" in payload
               ? payload.body
               : undefined;
-          const message = await requestService.sendChatMessage(
+          console.log(
+            `[Chat Socket] 📩 'chat:message' incoming from ${user?.firstName} (${user?.id}) for Room: ${requestId}`,
+          );
+          const message = await chatService.sendChatMessage(
             { requestId },
             user,
             body,
           );
-          socket.to(requestId).emit("chat:message", message);
           respondToChatEvent(socket, ack, undefined, message);
         } catch (error) {
+          console.error(
+            `[Chat Socket] ❌ 'chat:message' rejected for ${user?.firstName}:`,
+            error instanceof Error ? error.message : error,
+          );
           respondToChatEvent(socket, ack, error);
         }
       },
@@ -120,7 +147,13 @@ export const initSocket = (httpServer: HttpServer): Server => {
 
     void (async () => {
       await socket.join(`user:${user.id}`);
-      const requestIds = await requestService.chatRoomsForUser(user.id);
+      const requestIds = await chatService.chatRoomsForUser(user.id);
+      if (requestIds.length > 0) {
+        console.log(
+          `[Chat Socket] 🔄 Auto-joining ${user?.firstName} to (${requestIds.length}) active chat room(s):`,
+          requestIds,
+        );
+      }
       await socket.join(requestIds);
     })().catch((error: unknown) => {
       console.error("Unable to join user's active chat rooms:", error);
@@ -130,12 +163,20 @@ export const initSocket = (httpServer: HttpServer): Server => {
     socket.on("location:update", async (data) => {
       const { lat, lng } = data;
       console.log(
-        `Received location update from user ${user.firstName} ${user.lastName}: lat=${lat}, lng=${lng}`,
+        `Socket: User ${user.firstName} Location -> ${lat}, ${lng}`,
       );
-      await publishLocation(user.id, lat, lng);
+      try {
+        await publishLocation(user.id, lat, lng);
+      } catch (error) {
+        console.error("Failed to publish location to Kafka:", error);
+      }
     });
 
-    socket.on("disconnect", () => {});
+    socket.on("disconnect", (reason) => {
+      console.log(
+        `[Socket] 🔴 Disconnected: ${user?.firstName} ${user?.lastName || ""} (Socket: ${socket.id}, Reason: ${reason})`,
+      );
+    });
   });
 
   return io;

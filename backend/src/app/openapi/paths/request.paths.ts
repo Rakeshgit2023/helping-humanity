@@ -8,6 +8,7 @@ import {
 import { acceptRequestBodySchema } from "../../module/request/dto/acceptRequest.dto.js";
 import { requestIdParamSchema } from "../../module/request/dto/requestIdParam.dto.js";
 import { chatHistoryQuerySchema } from "../../module/chat-history/dto/chatHistory.dto.js";
+import { sendChatMessageSchema } from "../../module/chat-history/dto/sendChatMessage.dto.js";
 import { registry } from "../registry.js";
 
 const requestIdParamsSchema = requestIdParamSchema.extend({
@@ -124,6 +125,16 @@ const chatHistoryResponseSchema = requestActionResponseSchema(
     ),
     hasMore: z.boolean(),
     nextBefore: z.iso.datetime().nullable(),
+  }),
+);
+
+const sendChatMessageResponseSchema = requestActionResponseSchema(
+  z.object({
+    id: z.uuid(),
+    requestId: z.uuid(),
+    senderId: z.uuid(),
+    body: z.string(),
+    createdAt: z.iso.datetime(),
   }),
 );
 
@@ -442,6 +453,39 @@ registry.registerPath({
       content: {
         "application/json": {
           schema: chatHistoryResponseSchema,
+        },
+      },
+    },
+    ...commonErrorResponses,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/request/{requestId}/chat/messages",
+  tags: ["Request"],
+  summary: "Send a request chat message",
+  description:
+    "Saves and broadcasts a message to the request chat. Only the requester and accepted volunteers " +
+    "who have not left the chat may send messages. Messages are limited to 4000 characters.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: requestIdParamsSchema,
+    body: {
+      content: {
+        "application/json": {
+          schema: sendChatMessageSchema,
+          example: { body: "I am on my way." },
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: "Chat message sent successfully",
+      content: {
+        "application/json": {
+          schema: sendChatMessageResponseSchema,
         },
       },
     },
