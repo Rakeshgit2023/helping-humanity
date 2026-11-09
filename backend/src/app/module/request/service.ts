@@ -2090,3 +2090,140 @@ export const expireOverdueRequests = withErrorHandling(
     });
   },
 );
+
+export const myBroadcasts = withErrorHandling(
+  "Volunteer broadcasts",
+  async (user: User, status: "pending" | "all" = "pending") => {
+    const statuses =
+      status === "pending"
+        ? (["sent", "seen"] as const)
+        : (["sent", "seen", "accepted", "declined", "expired"] as const);
+
+    const rows = await db
+      .select({
+        broadcastId: requestBroadcasts.id,
+        broadcastStatus: requestBroadcasts.status,
+        distanceKm: requestBroadcasts.distanceKm,
+        notifiedAt: requestBroadcasts.notifiedAt,
+        requestId: requests.id,
+        title: requests.title,
+        description: requests.description,
+        address: requests.address,
+        lat: requests.lat,
+        lng: requests.lng,
+        priority: requests.priority,
+        requestStatus: requests.status,
+        bloodGroupNeeded: requests.bloodGroupNeeded,
+        hospitalName: requests.hospitalName,
+        totalVolunteersNeeded: requests.totalVolunteersNeeded,
+        expiresAt: requests.expiresAt,
+        createdAt: requests.createdAt,
+      })
+      .from(requestBroadcasts)
+      .innerJoin(requests, eq(requests.id, requestBroadcasts.requestId))
+      .where(
+        and(
+          eq(requestBroadcasts.volunteerId, user.id),
+          inArray(requestBroadcasts.status, [...statuses]),
+          // pending list me sirf wahi jo abhi accept ho sakti hain
+          ...(status === "pending"
+            ? [
+                eq(requests.status, "broadcasted"),
+                sql`(${requests.expiresAt} is null or ${requests.expiresAt} > now())`,
+              ]
+            : []),
+        ),
+      )
+      .orderBy(desc(requestBroadcasts.notifiedAt));
+
+    return rows.map((r) => ({
+      ...r,
+      distanceKm:
+        r.distanceKm == null ? null : Number(Number(r.distanceKm).toFixed(2)),
+    }));
+  },
+);
+
+export const requestDetail = withErrorHandling(
+  "Request detail",
+  async ({ requestId }: RequestIdParamInput, user: User) => {
+    const [request] = await db
+      .select({
+        id: requests.id,
+        requesterId: requests.requesterId,
+        title: requests.title,
+        description: requests.description,
+        address: requests.address,
+        lat: requests.lat,
+        lng: requests.lng,
+        priority: requests.priority,
+        status: requests.status,
+        bloodGroupNeeded: requests.bloodGroupNeeded,
+        hospitalName: requests.hospitalName,
+        broadcastRadiusKm: requests.broadcastRadiusKm,
+        totalVolunteersNeeded: requests.totalVolunteersNeeded,
+        expiresAt: requests.expiresAt,
+        createdAt: requests.createdAt,
+      })
+      .from(requests)
+      .where(eq(requests.id, requestId));
+
+    if (!request) throw ApiError.notFound("Request not found");
+
+    const isRequester = request.requesterId === user.id;
+    let myBroadcastStatus: string | null = null;
+    let myAssignment: { acceptedAt: Date; inProgressAt: Date | null } | null =
+      null;
+
+    if (!isRequester && user.role !== "admin") {
+      const [broadcast] = await db
+        .select({ status: requestBroadcasts.status })
+        .from(requestBroadcasts)
+        .where(
+          and(
+            eq(requestBroadcasts.requestId, requestId),
+            eq(requestBroadcasts.volunteerId, user.id),
+          ),
+        );
+
+      if (!broadcast) {
+        // 404 do, taaki request ke exist karne ka pata na chale
+        throw ApiError.notFound("Request not found");
+      }
+      myBroadcastStatus = broadcast.status;
+    }
+
+    if (!isRequester) {
+      const [assignment] = await db
+        .select({
+          acceptedAt: requestAssignments.acceptedAt,
+          inProgressAt: requestAssignments.inProgressAt,
+        })
+        .from(requestAssignments)
+        .where(
+          and(
+            eq(requestAssignments.requestId, requestId),
+            eq(requestAssignments.volunteerId, user.id),
+            isNull(requestAssignments.cancelledAt),
+          ),
+        );
+      myAssignment = assignment ?? null;
+    }
+
+    const photos = await db
+      .select({ photoUrl: requestPhotos.photoUrl })
+      .from(requestPhotos)
+      .where(eq(requestPhotos.requestId, requestId));
+
+    // requesterId volunteer ko mat bhejo
+    const { requesterId, ...publicRequest } = request;
+
+    return {
+      ...publicRequest,
+      photos: photos.map((p) => p.photoUrl),
+      isRequester,
+      myBroadcastStatus, // volunteer ke liye: sent/seen/accepted/declined/expired
+      myAssignment, // volunteer ne accept kiya ho to
+    };
+  },
+);

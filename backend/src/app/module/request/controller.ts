@@ -3,6 +3,7 @@ import * as requestService from "./service.js";
 import ApiResponse from "../../comman/utils/api.response.js";
 import type { RequestIdParamInput } from "./dto/requestIdParam.dto.js";
 import type { AcceptRequestBodyInput } from "./dto/acceptRequest.dto.js";
+import type { BroadcastListQueryInput } from "./dto/broadcastListQuery.dto.js";
 
 export const createRequest = async (req: Request, res: Response) => {
   const files = req.files as Express.Multer.File[];
@@ -59,4 +60,16 @@ export const cancelRequest = async (req: Request, res: Response) => {
   const params = req.validatedParams as RequestIdParamInput;
   const result = await requestService.cancelRequest(params, req.user);
   return ApiResponse.ok(res, "Request canceled successfully", result);
+};
+
+export const myBroadcasts = async (req: Request, res: Response) => {
+  const { status } = req.validatedQuery as BroadcastListQueryInput;
+  const result = await requestService.myBroadcasts(req.user, status);
+  return ApiResponse.ok(res, "Broadcasts fetched successfully", result);
+};
+
+export const requestDetail = async (req: Request, res: Response) => {
+  const params = req.validatedParams as RequestIdParamInput;
+  const result = await requestService.requestDetail(params, req.user);
+  return ApiResponse.ok(res, "Request fetched successfully", result);
 };
