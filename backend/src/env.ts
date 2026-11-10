@@ -1,0 +1,35 @@
+import z from "zod";
+import "dotenv/config";
+
+const envSchema = z.object({
+  PORT: z.string().optional(),
+  DATABASE_URL: z.string(),
+  JWT_ACCESS_SECRET: z.string(),
+  JWT_ACCESS_EXPIRES_IN: z.string(),
+  JWT_REFRESH_SECRET: z.string(),
+  JWT_REFRESH_EXPIRES_IN: z.string(),
+  SMTP_HOST: z.string(),
+  SMTP_PORT: z.string(),
+  SMTP_USER: z.string(),
+  SMTP_PASS: z.string(),
+  SMTP_FROM_NAME: z.string(),
+  CLIENT_URL: z.string(),
+  CLOUDINARY_CLOUD_NAME: z.string(),
+  CLOUDINARY_API_KEY: z.string(),
+  CLOUDINARY_API_SECRET: z.string(),
+  KAFKA_BROKERS: z.string(),
+  KAFKA_USERNAME: z.string(),
+  KAFKA_PASSWORD: z.string(),
+  KAFKA_SASL_MECHANISM: z
+    .enum(["plain", "scram-sha-256", "scram-sha-512"])
+    .default("plain"),
+  KAFKA_LOCATION_TOPIC: z.string(),
+});
+
+const createEnv = (env: NodeJS.ProcessEnv) => {
+  const safeParseResult = envSchema.safeParse(env);
+  if (!safeParseResult.success) throw new Error(safeParseResult.error.message);
+  return safeParseResult.data;
+};
+
+export const env = createEnv(process.env);

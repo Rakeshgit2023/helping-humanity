@@ -1,0 +1,37 @@
+class ApiError extends Error {
+  statusCode: number;
+  isOperational: boolean;
+
+  constructor(statusCode: number, message: string) {
+    super(message);
+    this.statusCode = statusCode; // ✅ alag alag likho
+    this.isOperational = true;
+    Error.captureStackTrace(this, this.constructor);
+  }
+
+  static badRequest(message = "Bad Request") {
+    return new ApiError(400, message);
+  }
+
+  static unauthorized(message = "Unauthorized") {
+    return new ApiError(401, message);
+  }
+
+  static forbidden(message = "Forbidden") {
+    return new ApiError(403, message); // ✅ 403
+  }
+
+  static notFound(message = "Not Found") {
+    return new ApiError(404, message); // ✅ 404
+  }
+
+  static conflict(message = "Conflict") {
+    return new ApiError(409, message);
+  }
+
+  static internal(message = "Internal Server Error") {
+    return new ApiError(500, message); // ✅ ye bhi add kar lo
+  }
+}
+
+export default ApiError;

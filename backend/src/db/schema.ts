@@ -1,0 +1,338 @@
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  timestamp,
+  boolean,
+  pgEnum,
+  uniqueIndex,
+  index,
+  date,
+  doublePrecision,
+  integer,
+  primaryKey,
+} from "drizzle-orm/pg-core";
+import {
+  bloodGroupValues,
+  broadcastStatusValues,
+  genderValues,
+  priorityValues,
+  requestStatusValues,
+  roleValues,
+} from "../app/comman/utils/constant.js";
+import { sql } from "drizzle-orm/sql/sql";
+
+export const roleEnum = pgEnum("role", roleValues);
+
+export const genderEnum = pgEnum("gender", genderValues);
+
+export const bloodGroupEnum = pgEnum("blood_group", bloodGroupValues);
+
+export const priorityEnum = pgEnum("priority", priorityValues);
+
+export const requestStatusEnum = pgEnum("request_status", requestStatusValues);
+
+export const broadcastStatusEnum = pgEnum(
+  "broadcast_status",
+  broadcastStatusValues,
+);
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    firstName: varchar("first_name", { length: 100 }).notNull(),
+    lastName: varchar("last_name", { length: 100 }).notNull(),
+    phone: varchar("phone", { length: 20 }).notNull(),
+    email: varchar("email", { length: 322 }).notNull(),
+    dob: date("dob"),
+    passwordHash: varchar("password", { length: 66 }),
+    role: roleEnum("role").notNull().default("user"),
+    gender: genderEnum("gender").notNull(),
+    avatarUrl: text("avatar_url"),
+    isEmailVerified: boolean("is_email_verified").notNull().default(false),
+    isBanned: boolean("is_banned").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date(),
+    ),
+  },
+  (t) => [
+    uniqueIndex("users_phone_idx").on(t.phone),
+    uniqueIndex("users_email_idx").on(t.email),
+  ],
+);
+
+export const userLocations = pgTable(
+  "user_locations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    requestId: uuid("request_id").references(() => requests.id, {
+      onDelete: "cascade",
+    }),
+
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+
+    recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull(),
+  },
+  (t) => [
+    uniqueIndex("user_locations_user_recorded_uq").on(t.userId, t.recordedAt),
+  ],
+);
+
+export const emailVerificationOtps = pgTable(
+  "email_verification_otps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+
+    otpHash: varchar("otp_hash", { length: 255 }).notNull(),
+
+    expiresAt: timestamp("expires_at", {
+      withTimezone: true,
+    }).notNull(),
+
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+    })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [uniqueIndex("email_verification_otps_user_idx").on(t.userId)],
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    refreshTokenHash: text("refresh_token_hash").notNull(),
+    userAgent: text("user_agent"),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("sessions_user_idx").on(t.userId),
+    uniqueIndex("sessions_refresh_token_hash_idx").on(t.refreshTokenHash),
+  ],
+);
+
+export const volunteerProfiles = pgTable(
+  "volunteer_profiles",
+  {
+    userId: uuid("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    bio: text("bio"),
+    isVerified: boolean("is_verified").notNull().default(false), // admin-approved
+    isAvailable: boolean("is_available").notNull().default(true), // on/off duty toggle
+    bloodGroup: bloodGroupEnum("blood_group"), // relevant if interested in blood_donation
+    ratingAvg: doublePrecision("rating_avg").notNull().default(0),
+    ratingCount: integer("rating_count").notNull().default(0),
+    avgResponseMinutes: integer("avg_response_minutes"), // powers the "Avg response" stat
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date(),
+    ),
+  },
+  (t) => [index("volunteer_availability_idx").on(t.isAvailable)],
+);
+
+export const category = pgTable(
+  "category",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull().unique(),
+    isActive: boolean("is_active").notNull().default(true),
+  },
+  (t) => [uniqueIndex("category_name_idx").on(t.name)],
+);
+
+export const volunteerInterests = pgTable(
+  "volunteer_interests",
+  {
+    volunteerId: uuid("volunteer_id")
+      .notNull()
+      .references(() => volunteerProfiles.userId, { onDelete: "cascade" }),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade" }),
+  },
+  (t) => [primaryKey({ columns: [t.volunteerId, t.categoryId] })],
+);
+
+// ============================================================
+// REQUESTS
+// ============================================================
+
+export const requests = pgTable(
+  "requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requesterId: uuid("requester_id")
+      .notNull()
+      .references(() => users.id),
+    categoryId: uuid("category_id")
+      .notNull()
+      .references(() => category.id, { onDelete: "cascade" }),
+    title: varchar("title", { length: 160 }).notNull(),
+    description: text("description"),
+
+    // location snapshot at request time (the incident location, not the
+    // volunteer's live position, which moves)
+    lat: doublePrecision("lat").notNull(),
+    lng: doublePrecision("lng").notNull(),
+    address: text("address"),
+
+    // only meaningful for category = blood_donation
+    bloodGroupNeeded: bloodGroupEnum("blood_group_needed"),
+    hospitalName: varchar("hospital_name", { length: 160 }),
+
+    priority: priorityEnum("priority").notNull().default("normal"),
+    status: requestStatusEnum("status").notNull().default("broadcasted"),
+
+    broadcastRadiusKm: doublePrecision("broadcast_radius_km")
+      .notNull()
+      .default(3),
+
+    totalVolunteersNeeded: integer("total_volunteers_needed")
+      .notNull()
+      .default(1),
+
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date(),
+    ),
+    expiresAt: timestamp("expires_at", { withTimezone: true }), // SLA deadline, esp. for urgent/blood
+  },
+  (t) => [
+    index("requests_status_idx").on(t.status),
+    index("requests_category_idx").on(t.categoryId),
+    index("requests_requester_idx").on(t.requesterId),
+    index("requests_priority_idx").on(t.priority),
+  ],
+);
+
+export const requestPhotos = pgTable(
+  "request_photos",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    photoUrl: text("photo_url").notNull(),
+  },
+  (t) => [index("request_photos_request_idx").on(t.requestId)],
+);
+
+export const requestBroadcasts = pgTable(
+  "request_broadcasts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    volunteerId: uuid("volunteer_id")
+      .notNull()
+      .references(() => users.id),
+    distanceKm: doublePrecision("distance_km"),
+    status: broadcastStatusEnum("status").notNull().default("sent"),
+    notifiedAt: timestamp("notified_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    respondedAt: timestamp("responded_at", { withTimezone: true }),
+  },
+  (t) => [
+    index("broadcasts_request_idx").on(t.requestId),
+    index("broadcasts_volunteer_idx").on(t.volunteerId),
+    uniqueIndex("broadcasts_request_volunteer_uidx").on(
+      t.requestId,
+      t.volunteerId,
+    ),
+  ],
+);
+
+export const requestAssignments = pgTable(
+  "request_assignments",
+  {
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    volunteerId: uuid("volunteer_id")
+      .notNull()
+      .references(() => users.id),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    inProgressAt: timestamp("in_progress_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.volunteerId] }),
+    uniqueIndex("one_active_assignment_per_volunteer_uidx")
+      .on(t.volunteerId)
+      .where(sql`completed_at is null and cancelled_at is null`),
+    index("assignments_request_idx").on(t.requestId),
+  ],
+);
+
+export const chatParticipants = pgTable(
+  "chat_participants",
+  {
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true }), // volunteer cancel kare to set hoga
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.userId] }),
+    index("chat_participants_user_idx").on(t.userId),
+  ],
+);
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("chat_messages_request_created_idx").on(t.requestId, t.createdAt),
+  ],
+);
