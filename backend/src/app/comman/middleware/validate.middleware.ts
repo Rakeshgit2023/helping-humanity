@@ -3,7 +3,7 @@ import ApiError from "../utils/api.error.js";
 import type BaseDto from "../dto/base.dto.js";
 import { requireFiles } from "./upload.middleware.js";
 
-type ValidateSource = "body" | "query" | "params";
+type ValidateSource = "body" | "query";
 
 export const validate = (
   dto: BaseDto,
@@ -12,7 +12,6 @@ export const validate = (
 ) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     const { errors, value } = await dto.validate(req[source]);
-    console.log("Validation errors:", errors);
     const allErrors: string[] = errors ? [...errors] : [];
 
     if (isFileRequired) {
@@ -28,8 +27,6 @@ export const validate = (
       req.body = value;
     } else if (source === "query") {
       req.validatedQuery = value;
-    } else if (source === "params") {
-      req.validatedParams = value;
     }
 
     next();

@@ -21,7 +21,6 @@ import {
   requestStatusValues,
   roleValues,
 } from "../app/comman/utils/constant.js";
-import { sql } from "drizzle-orm/sql/sql";
 
 export const roleEnum = pgEnum("role", roleValues);
 
@@ -272,27 +271,17 @@ export const requestBroadcasts = pgTable(
   ],
 );
 
-export const requestAssignments = pgTable(
-  "request_assignments",
-  {
-    requestId: uuid("request_id")
-      .notNull()
-      .references(() => requests.id, { onDelete: "cascade" }),
-    volunteerId: uuid("volunteer_id")
-      .notNull()
-      .references(() => users.id),
-    acceptedAt: timestamp("accepted_at", { withTimezone: true })
-      .notNull()
-      .defaultNow(),
-    inProgressAt: timestamp("in_progress_at", { withTimezone: true }),
-    completedAt: timestamp("completed_at", { withTimezone: true }),
-    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-  },
-  (t) => [
-    primaryKey({ columns: [t.requestId, t.volunteerId] }),
-    uniqueIndex("one_active_assignment_per_volunteer_uidx")
-      .on(t.volunteerId)
-      .where(sql`completed_at is null and cancelled_at is null`),
-    index("assignments_request_idx").on(t.requestId),
-  ],
-);
+export const requestAssignments = pgTable("request_assignments", {
+  requestId: uuid("request_id")
+    .primaryKey()
+    .references(() => requests.id, { onDelete: "cascade" }),
+  volunteerId: uuid("volunteer_id")
+    .notNull()
+    .references(() => users.id),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  inProgressAt: timestamp("in_progress_at", { withTimezone: true }),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+});
