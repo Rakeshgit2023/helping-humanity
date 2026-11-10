@@ -271,17 +271,67 @@ export const requestBroadcasts = pgTable(
   ],
 );
 
-export const requestAssignments = pgTable("request_assignments", {
-  requestId: uuid("request_id")
-    .primaryKey()
-    .references(() => requests.id, { onDelete: "cascade" }),
-  volunteerId: uuid("volunteer_id")
-    .notNull()
-    .references(() => users.id),
-  acceptedAt: timestamp("accepted_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  inProgressAt: timestamp("in_progress_at", { withTimezone: true }),
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-});
+export const requestAssignments = pgTable(
+  "request_assignments",
+  {
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    volunteerId: uuid("volunteer_id")
+      .notNull()
+      .references(() => users.id),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    inProgressAt: timestamp("in_progress_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.volunteerId] }),
+    uniqueIndex("one_active_assignment_per_volunteer_uidx")
+      .on(t.volunteerId)
+      .where(sql`completed_at is null and cancelled_at is null`),
+    index("assignments_request_idx").on(t.requestId),
+  ],
+);
+
+export const chatParticipants = pgTable(
+  "chat_participants",
+  {
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    joinedAt: timestamp("joined_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true }), // volunteer cancel kare to set hoga
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.userId] }),
+    index("chat_participants_user_idx").on(t.userId),
+  ],
+);
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => requests.id, { onDelete: "cascade" }),
+    senderId: uuid("sender_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("chat_messages_request_created_idx").on(t.requestId, t.createdAt),
+  ],
+);

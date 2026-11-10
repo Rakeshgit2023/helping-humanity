@@ -9,6 +9,9 @@ import { catchAsyncErrors } from "../../comman/middleware/catchAsyncError.js";
 import { isAuthenticated } from "../../comman/middleware/auth.middleware.js";
 import { validate } from "../../comman/middleware/validate.middleware.js";
 import createRequestDto from "./dto/createRequest.dto.js";
+import requestIdParamDto from "./dto/requestIdParam.dto.js";
+import acceptRequestDto from "./dto/acceptRequest.dto.js";
+import broadcastListQueryDto from "./dto/broadcastListQuery.dto.js";
 
 const router: Router = Router();
 
@@ -21,7 +24,7 @@ router.post(
   catchAsyncErrors(controller.createRequest),
 );
 
-router.post(
+router.get(
   "/:requestId/volunteers",
   isAuthenticated,
   authorize("user", "volunteer"),
@@ -75,6 +78,22 @@ router.post(
   authorize("user", "volunteer"),
   validate(requestIdParamDto, "params"),
   catchAsyncErrors(controller.cancelRequest),
+);
+
+router.get(
+  "/my-broadcasts",
+  isAuthenticated,
+  authorize("volunteer"),
+  validate(broadcastListQueryDto, "query"),
+  catchAsyncErrors(controller.myBroadcasts),
+);
+
+router.get(
+  "/:requestId",
+  isAuthenticated,
+  authorize("user", "volunteer", "admin"),
+  validate(requestIdParamDto, "params"),
+  catchAsyncErrors(controller.requestDetail),
 );
 
 export default router;
