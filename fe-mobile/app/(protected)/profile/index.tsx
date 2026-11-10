@@ -1,13 +1,16 @@
 import { Text } from 'react-native';
 
+import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ErrorView } from '@/components/ui/ErrorView';
 import { Loading } from '@/components/ui/Loading';
 import { Screen } from '@/components/ui/Screen';
 import { Header } from '@/components/layout/Header';
+import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useProfile } from '@/features/user/hooks/useProfile';
 
 export default function ProfileScreen() {
+  const { logout } = useAuth();
   const { data: profile, isLoading, isError, refetch } = useProfile();
 
   return (
@@ -25,6 +28,10 @@ export default function ProfileScreen() {
           <Text className="mt-1 text-sm text-gray-500 dark:text-gray-400">{profile.email}</Text>
         </Card>
       ) : null}
+
+      <Button className="mt-6" variant="danger" onPress={() => logout()}>
+        Log out
+      </Button>
     </Screen>
   );
 }
