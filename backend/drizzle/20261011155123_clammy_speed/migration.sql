@@ -1,2 +1,0 @@
-ALTER TABLE "user_locations" ADD COLUMN "request_id" uuid;--> statement-breakpoint
-ALTER TABLE "user_locations" ADD CONSTRAINT "user_locations_request_id_requests_id_fkey" FOREIGN KEY ("request_id") REFERENCES "requests"("id") ON DELETE CASCADE;
